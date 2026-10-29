@@ -52,11 +52,11 @@ All values are public addresses and block numbers. Vite only reads them at start
 | Name | Purpose |
 | --- | --- |
 | `VITE_NETWORK_DEFAULT` | `testnet` or `mainnet`, the network used on first load |
-| `VITE_TENOR_TESTNET` | Tenor contract on Arc Testnet |
+| `VITE_TENOR_ADDRESS_TESTNET` | Tenor contract on Arc Testnet |
 | `VITE_FEED_TESTNET` | Mock EUR/USD feed on Arc Testnet |
 | `VITE_EURC_TESTNET` | EURC token on Arc Testnet |
 | `VITE_DEPLOY_BLOCK_TESTNET` | Block Tenor was deployed at, where event scanning starts |
-| `VITE_TENOR_MAINNET` | Tenor contract on Arc Mainnet (empty until you deploy it) |
+| `VITE_TENOR_ADDRESS_MAINNET` | Tenor contract on Arc Mainnet (empty until you deploy it; the app shows a notice while it is empty) |
 | `VITE_FEED_MAINNET` | Chainlink EUR/USD feed on Arc Mainnet |
 | `VITE_EURC_MAINNET` | EURC token on Arc Mainnet |
 | `VITE_DEPLOY_BLOCK_MAINNET` | Block Tenor was deployed at on Arc Mainnet |

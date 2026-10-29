@@ -6,7 +6,7 @@ import { fmtDuration } from '@/lib/math'
 import { Button, Notice } from './ui'
 
 export function Banners() {
-  const { net } = useNet()
+  const { net, setKey } = useNet()
   const { wrongNetwork, walletChainId } = useWallet()
   const { switchChain, isPending } = useSwitchChain()
   const spot = useSpot()
@@ -24,10 +24,14 @@ export function Banners() {
         </div>
       ) : null}
       {!net.tenor ? (
-        <Notice tone="warn" title={`Tenor is not deployed on ${net.label}`}>
-          No contract address is configured for this network, so the app is read-only here. Deploy Tenor from your own wallet, then set
-          the address and deployment block in the project environment.
-        </Notice>
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warn/30 bg-warn/5 px-4 py-3">
+          <div className="text-sm text-ink-2">
+            <span className="font-semibold text-ink">Tenor is not deployed on {net.label} yet – switch to Testnet to try it</span>
+          </div>
+          {net.isMainnet ? (
+            <Button onClick={() => setKey('testnet')}>Switch to Testnet</Button>
+          ) : null}
+        </div>
       ) : null}
       {net.tenor && spot.data?.stale ? (
         <Notice tone="warn" title="Price feed is stale">

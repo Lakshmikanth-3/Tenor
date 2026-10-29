@@ -422,7 +422,13 @@ let _providerChainId = 0;
 
 function patchProvider(provider: EIP1193Provider | undefined): void {
   if (!provider?.request || provider.__studioPatched) return;
-  provider.__studioPatched = true;
+  // Some wallet extensions freeze their provider; adding a property would throw.
+  if (!Object.isExtensible(provider)) return;
+  try {
+    provider.__studioPatched = true;
+  } catch {
+    return;
+  }
 
   const _request = provider.request.bind(provider);
   log('patching EIP-1193 provider');
@@ -473,29 +479,32 @@ function patchProvider(provider: EIP1193Provider | undefined): void {
   } catch { /* not all providers support .on() */ }
 }
 
-try {
-  // Case 1: provider already exists
-  const existingProvider = getEthereum();
-  if (existingProvider) {
-    patchProvider(existingProvider);
-  }
+// Provider patching is a development-only instrument: it never runs in production builds.
+if (import.meta.env.DEV) {
+  try {
+    // Case 1: provider already exists
+    const existingProvider = getEthereum();
+    if (existingProvider) {
+      patchProvider(existingProvider);
+    }
 
-  // Case 2: provider set later (wallet extensions inject asynchronously)
-  let _eth: EIP1193Provider | undefined = existingProvider;
-  Object.defineProperty(window, 'ethereum', {
-    configurable: true,
-    enumerable: true,
-    get() { return _eth; },
-    set(v: EIP1193Provider | undefined) {
-      _eth = v;
-      patchProvider(v);
-    },
-  });
+    // Case 2: provider set later (wallet extensions inject asynchronously)
+    let _eth: EIP1193Provider | undefined = existingProvider;
+    Object.defineProperty(window, 'ethereum', {
+      configurable: true,
+      enumerable: true,
+      get() { return _eth; },
+      set(v: EIP1193Provider | undefined) {
+        _eth = v;
+        patchProvider(v);
+      },
+    });
 
-  // Case 3: EIP-6963 multi-provider discovery
-  window.addEventListener('eip6963:announceProvider', ((e: EIP6963AnnounceProviderEvent) => {
-    patchProvider(e?.detail?.provider);
-  }));
-} catch (e) { log('EIP-1193 patch FAILED', e); }
+    // Case 3: EIP-6963 multi-provider discovery
+    window.addEventListener('eip6963:announceProvider', ((e: EIP6963AnnounceProviderEvent) => {
+      patchProvider(e?.detail?.provider);
+    }));
+  } catch (e) { log('EIP-1193 patch FAILED', e); }
+}
 
 log('initialized');

@@ -46,7 +46,7 @@ function build(key: NetworkKey): NetworkCfg {
     isMainnet: key === 'mainnet',
     rpcUrl: facts.rpcUrls[0],
     usdc: usdc.address as Address,
-    tenor: addr(env[`VITE_TENOR_${suffix}`]),
+    tenor: addr(env[`VITE_TENOR_ADDRESS_${suffix}`] ?? env[`VITE_TENOR_${suffix}`]),
     feed: addr(env[`VITE_FEED_${suffix}`]),
     eurc: addr(env[`VITE_EURC_${suffix}`]),
     deployBlock: block(env[`VITE_DEPLOY_BLOCK_${suffix}`]),

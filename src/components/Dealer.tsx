@@ -143,8 +143,8 @@ export function Dealer() {
             >
               <input className={inputClass} inputMode="decimal" value={rateStr} placeholder={quote ? fmtRate(quote.forwardFair) : ''} onChange={(e) => setRateStr(e.target.value)} />
             </Field>
-            <Field label="Initial margin (bps)" hint={`Minimum ${minBps.toString()} bps. Each side posts ${fmtToken(need)} USDC.`}>
-              <input className={inputClass} inputMode="numeric" value={marginBps} placeholder={minBps.toString()} onChange={(e) => setMarginBps(e.target.value)} />
+            <Field label="Initial margin (bps)" hint={params.data ? `Minimum ${minBps.toString()} bps. Each side posts ${fmtToken(need)} USDC.` : undefined}>
+              <input className={inputClass} inputMode="numeric" value={marginBps} placeholder={params.data ? minBps.toString() : ''} onChange={(e) => setMarginBps(e.target.value)} />
             </Field>
             <Field label="Quote valid for (minutes)">
               <input className={inputClass} inputMode="numeric" value={expiryMin} onChange={(e) => setExpiryMin(e.target.value)} />

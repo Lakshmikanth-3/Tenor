@@ -76,7 +76,11 @@ export function QuotePage() {
     return (
       <Wrap>
         <Notice tone="bad" title="This quote link could not be read">
-          The link is incomplete or damaged. Ask the dealer to send it again, or go back to <Link className="underline" to="/">Hedge</Link>.
+          The link is incomplete or damaged. Ask the dealer to send it again, or go back to the{' '}
+          <Link className="font-semibold text-accent-hover underline underline-offset-2" to="/">
+            Hedge page
+          </Link>
+          .
         </Notice>
       </Wrap>
     )
