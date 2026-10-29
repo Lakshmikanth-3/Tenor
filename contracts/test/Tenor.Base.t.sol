@@ -46,7 +46,10 @@ abstract contract TenorTestBase is Test {
         address[] memory ds = new address[](2);
         ds[0] = dealer;
         ds[1] = dealer2;
-        tenor = new Tenor(owner, address(eurc), address(feed), RUSD, REUR, ds);
+        tenor = new Tenor(owner, address(eurc), address(feed), RUSD, REUR, ds, address(0));
+        // v1 test fixture: pin the original 120s cure window / delivery grace (v2 defaults are 300s / 900s).
+        vm.prank(owner);
+        tenor.setRiskParams(Tenor.RiskParams(500, 300, 50, 60, 120, 120, 300, 50e6, 90_000));
     }
 
     // ----------------------------- reference maths (independent) -----------------------------

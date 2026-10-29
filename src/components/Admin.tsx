@@ -9,6 +9,7 @@ import { feedAbi } from '@/lib/feedAbi'
 import { fmtDateTime, fmtDuration, fmtRate, parseRate } from '@/lib/math'
 import { Link } from '@/lib/router'
 import { RiskPanel } from './RiskPanel'
+import { VaultPanel } from './VaultPanel'
 import { AddressLink, Badge, Button, Card, Field, Notice, SectionTitle, Stat, TxStatus, inputClass } from './ui'
 
 export function Admin() {
@@ -97,6 +98,9 @@ export function Admin() {
             </div>
           ) : null}
         </Card>
+      </div>
+      <div className="mt-6">
+        <VaultPanel />
       </div>
       <RiskPanel />
     </Wrap>

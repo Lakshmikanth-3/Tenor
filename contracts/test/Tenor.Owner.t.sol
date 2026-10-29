@@ -230,12 +230,12 @@ contract TenorOwnerTest is TenorTestBase {
     function test_Owner_Constructor_Reverts() public {
         address[] memory ds = new address[](0);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableInvalidOwner.selector, address(0)));
-        new Tenor(address(0), address(eurc), address(feed), 0, 0, ds);
+        new Tenor(address(0), address(eurc), address(feed), 0, 0, ds, address(0));
         vm.expectRevert(Tenor.ZeroAddress.selector);
-        new Tenor(owner, address(0), address(feed), 0, 0, ds);
+        new Tenor(owner, address(0), address(feed), 0, 0, ds, address(0));
         vm.expectRevert(Tenor.ParamOutOfBounds.selector);
-        new Tenor(owner, USDC_ADDR, address(feed), 0, 0, ds);
+        new Tenor(owner, USDC_ADDR, address(feed), 0, 0, ds, address(0));
         vm.expectRevert(Tenor.ParamOutOfBounds.selector);
-        new Tenor(owner, address(eurc), address(feed), 0.5e18 + 1, 0, ds);
+        new Tenor(owner, address(eurc), address(feed), 0.5e18 + 1, 0, ds, address(0));
     }
 }

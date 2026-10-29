@@ -30,6 +30,11 @@ export const ERROR_COPY: Record<string, string> = {
   ParamOutOfBounds: 'That setting is outside the allowed bounds.',
   NotPhysical: 'This trade is cash-settled, so there are no delivery legs to fund.',
   TradeNotFound: 'No trade exists with that id.',
+  YieldUnavailable: 'Yield on idle margin is not available right now (no vault, or new deposits are paused).',
+  YieldVaultInUse: 'The yield vault cannot be changed while accounts still hold vault shares.',
+  VaultMismatch: 'The yield vault did not take exactly the USDC that was sent, so the deposit was cancelled.',
+  VaultRedeemFailed: 'The yield vault could not redeem right now. Margin locked in trades and settlement are not affected.',
+  VaultDepositFailed: 'The yield vault could not accept the deposit right now.',
 }
 
 export interface DecodedError {

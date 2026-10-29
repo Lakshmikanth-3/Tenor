@@ -10,6 +10,7 @@ import { useTxHistory } from '@/lib/txstore'
 import { Link } from '@/lib/router'
 import { Badge, Button, Card, Empty, SectionTitle, Stat, TxLink, TxStatus } from './ui'
 import { MarginDeposit } from './MarginDeposit'
+import { YieldPanel } from './YieldPanel'
 import { TradeCard } from './TradeCard'
 
 export function Trades() {
@@ -85,7 +86,7 @@ function Account({ address }: { address: Address }) {
     <Card>
       <SectionTitle>Balances in Tenor</SectionTitle>
       <div className="grid grid-cols-2 gap-5">
-        <Stat label="Free USDC" value={bal.data ? fmtToken(bal.data.freeUsdc) : '–'} sub="margin and payouts" />
+        <Stat label="Free USDC" value={bal.data ? fmtToken(bal.data.freeUsdc) : '–'} sub="margin, payouts and vault" />
         <Stat label="EURC credit" value={bal.data ? fmtToken(bal.data.creditEurc) : '–'} sub="delivered, withdrawable" />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -103,6 +104,9 @@ function Account({ address }: { address: Address }) {
         </Button>
       </div>
       <TxStatus state={state} />
+      <div className="mt-5 border-t border-line pt-4">
+        <YieldPanel />
+      </div>
       <div className="mt-5 border-t border-line pt-4">
         <MarginDeposit />
       </div>

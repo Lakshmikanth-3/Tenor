@@ -1,6 +1,7 @@
 import { encodeFunctionData, erc20Abi, type Address, type Hex } from 'viem'
 import { tenorAbi } from './tenorAbi'
 import { feedAbi } from './feedAbi'
+import { vaultAbi } from './vaultAbi'
 import { quoteTuple, type QuoteMsg } from './quote'
 
 export interface RiskParamsArg {
@@ -56,6 +57,11 @@ const t = (to: Address) => ({
     to,
     data: encodeFunctionData({ abi: tenorAbi, functionName: 'setRiskParams', args: [p] }),
   }),
+  setYieldMode: (on: boolean): Call => ({
+    to,
+    data: encodeFunctionData({ abi: tenorAbi, functionName: 'setYieldMode', args: [on] }),
+  }),
+  sweepToYield: (): Call => ({ to, data: encodeFunctionData({ abi: tenorAbi, functionName: 'sweepToYield' }) }),
   cancelNonce: (nonce: bigint): Call => ({
     to,
     data: encodeFunctionData({ abi: tenorAbi, functionName: 'cancelNonce', args: [nonce] }),
@@ -72,4 +78,14 @@ export const approveCall = (token: Address, spender: Address, amount: bigint): C
 export const setAnswerCall = (feed: Address, answer: bigint): Call => ({
   to: feed,
   data: encodeFunctionData({ abi: feedAbi, functionName: 'setAnswer', args: [answer] }),
+})
+
+export const bumpVaultPriceCall = (vault: Address, bps: bigint): Call => ({
+  to: vault,
+  data: encodeFunctionData({ abi: vaultAbi, functionName: 'bumpPrice', args: [bps] }),
+})
+
+export const fundVaultYieldCall = (vault: Address, amount: bigint): Call => ({
+  to: vault,
+  data: encodeFunctionData({ abi: vaultAbi, functionName: 'fundYield', args: [amount] }),
 })

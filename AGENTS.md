@@ -35,6 +35,14 @@ This is the **project memory** - what Arc Studio remembers about building this a
 - MTM is `notional*(forwardNow - rate)/rate` (intentionally not the originally requested `1 - rate/forwardNow`).
 - Tests: `forge test --match-path 'contracts/test/Tenor.*t.sol'` (132 tests).
 
+## Tenor v2 (yield-bearing margin, Arc Testnet) - current testnet target
+
+- Tenor v2: `0xfa9d0a455959c5fa6e57b4e3fdee9b062bacc3ee`, deploy block 69655019, tx `0xa5307afdf43ac3ab3e167292aba851170ae67829a08e038204ccfed776af78c7`. v1 above stays deployed and untouched; v1 metadata is saved as `contracts/contract-metadata/Tenor.v1.json`.
+- MockYieldVault ("Mock USYC (testnet)", 4.5%/yr): `0xf724adeaa22f546b84e796c09734e36f13d9dd4b`, tx `0x3e3d715b218add114ef10b7c7bcebc66294d5d44f411c4003ee897687d078b4a`. Owner `0x43DD...EFDC`. It needs USDC funded to its reserve (fundYield) to pay accrued yield.
+- Constructor gained a 7th arg `yieldVault_` (zero = off); defaults are now cureWindow 300, deliveryGrace 900. Existing tests pin 120/120 in `Tenor.Base.t.sol` so v1 behaviour tests are unchanged.
+- Locked trade margin is always plain USDC; mark/closeOut/settle never touch the vault. `marginOf` is plain only; `freeMarginOf` = plain + vault value; `yieldEarned` = realised + unrealised.
+- Tests: `forge test --match-path 'contracts/test/Tenor.*t.sol'` (245 tests, 113 new for yield).
+
 ## Web app
 
 - Pages (path routing, `src/App.tsx`): `/` Hedge, `/trades`, `/dealer`, `/quote?q=...` (signed dealer quote link), `/refusal`, `/admin` (testnet only).

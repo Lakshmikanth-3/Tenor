@@ -12,6 +12,7 @@ import { useLocation } from '@/lib/router'
 import { decodeRevert, isUserRejection } from '@/lib/errors'
 import { Badge, Button, Card, CopyButton, Field, Notice, SectionTitle, Segmented, TxStatus, inputClass } from './ui'
 import { MarginDeposit } from './MarginDeposit'
+import { YieldPanel } from './YieldPanel'
 
 const toLocalInput = (ts: number) => {
   const d = new Date(ts * 1000)
@@ -194,6 +195,9 @@ export function Dealer() {
           <Card>
             <SectionTitle>Dealer margin</SectionTitle>
             <p className="mb-3 text-sm text-muted">The dealer posts the same initial margin as the hedger when a quote is taken.</p>
+            <div className="mb-4 border-b border-line pb-4">
+              <YieldPanel />
+            </div>
             <MarginDeposit needed={need} />
           </Card>
           <Card>
