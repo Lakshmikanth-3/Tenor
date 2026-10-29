@@ -60,3 +60,36 @@ All values are public addresses and block numbers. Vite only reads them at start
 | `VITE_FEED_MAINNET` | Chainlink EUR/USD feed on Arc Mainnet |
 | `VITE_EURC_MAINNET` | EURC token on Arc Mainnet |
 | `VITE_DEPLOY_BLOCK_MAINNET` | Block Tenor was deployed at on Arc Mainnet |
+
+## Roadmap: yield-bearing margin (USYC)
+
+Not built yet. Version 1 keeps all margin in USDC.
+
+### Problem
+
+Initial and variation margin is idle capital until maturity. Each side posts about 5% of the notional, so roughly 10% of notional is locked across both sides. A 100,000 USDC hedge held for 60 days ties up about 10,000 USDC that earns nothing.
+
+### Design
+
+- Margin can be held as USYC, Circle's tokenized money-market fund, using the Teller to deposit USDC and redeem back to it.
+- Margin value is the USYC balance multiplied by the USYC price, so margin calls and health checks stay in USDC terms.
+- Each party keeps the yield on its own margin.
+- A USDC buffer (for example 20% of each party's margin) stays liquid, so margin calls and close-outs never wait for a redemption.
+
+### Arc addresses
+
+| Contract | Mainnet | Testnet |
+| --- | --- | --- |
+| USYC | `0x8a5D989Bbb96929F689B0200f435f53dA42bF490` | `0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C` |
+| Teller | `0x51A8CE47dC08ba5CD19c7aa84EA6fD6664f60f9b` | `0x9fdF14c5B14173D74C08Af27AebFf39240dC105A` |
+| Entitlements | `0xb69ecb156Dc0028198028c501340d5367845ca72` | `0xcc205224862c7641930c87679e98999d23c26113` |
+
+### Constraints
+
+- USYC is permissioned. The Tenor contract and every user must be allowlisted before they can hold or redeem it.
+- On mainnet, USYC is for institutions outside the United States, with a 100,000 USD minimum investment (per Arc's documentation).
+- Because of this, version 1 keeps margin in USDC. Yield-bearing margin would need a permissioned deployment or an opt-in mode for eligible users.
+
+### Example
+
+10,000 USDC of margin earning about 4.5% a year for 60 days earns roughly 10,000 × 0.045 × 60 / 365 ≈ 74 USDC in total, about 37 USDC per side. The 4.5% is an illustration, not a quote.
