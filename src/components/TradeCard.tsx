@@ -44,18 +44,19 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
   const legToken = sellsUsd ? net.usdc : (net.eurc as Address)
   const legAmount = sellsUsd ? t.notionalUsd6 : t.eurAmount6
   const canFund = open && !t.cashSettled && matured && !myLegFunded
+  const legSymbol = sellsUsd ? 'USDC' : 'EURC'
+  const approved = !!bal.data && (sellsUsd ? bal.data.allowUsdc : bal.data.allowEurc) >= legAmount
+  const showApprove = open && !t.cashSettled && !myLegFunded && !!bal.data && !approved
 
   const barMax = (initial > myMargin ? initial : myMargin) * 2n || 1n
   const pct = (v: bigint) => Math.min(100, Number((v * 10000n) / barMax) / 100)
   const tone = myMargin < maintenance ? 'bg-danger' : myMargin < initial ? 'bg-warn' : 'bg-success'
 
+  const approveLeg = () => run(`Allow ${legSymbol} for delivery`, approveCall(legToken, tenor, legAmount))
+
   const fundLeg = async () => {
     if (!bal.data) return
-    const allowance = sellsUsd ? bal.data.allowUsdc : bal.data.allowEurc
-    if (allowance < legAmount) {
-      const ok = await run(`Allow ${sellsUsd ? 'USDC' : 'EURC'}`, approveCall(legToken, tenor, legAmount))
-      if (!ok) return
-    }
+    if (!approved && !(await approveLeg())) return
     await run('Fund leg', tenorCalls(tenor).fundLeg(row.id))
   }
 
@@ -158,9 +159,15 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
             {canMark ? 'Mark' : `Mark in ${fmtDuration(Number(t.lastMarkAt) + Number(params.markInterval) - now)}`}
           </Button>
         ) : null}
+        {showApprove ? (
+          <Button onClick={approveLeg} loading={busy}>
+            Approve {legSymbol} for delivery
+          </Button>
+        ) : null}
+        {open && !t.cashSettled && !myLegFunded && approved && !matured ? <Badge tone="good">{legSymbol} approved for delivery</Badge> : null}
         {canFund ? (
           <Button variant="primary" onClick={fundLeg} loading={busy}>
-            Fund {sellsUsd ? 'USDC' : 'EURC'} leg ({fmtToken(legAmount)})
+            Fund {legSymbol} leg ({fmtToken(legAmount)}){approved ? '' : ' · approve first'}
           </Button>
         ) : null}
         {open && matured ? (

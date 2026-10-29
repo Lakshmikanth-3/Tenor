@@ -8,6 +8,7 @@ import { setAnswerCall } from '@/lib/calls'
 import { feedAbi } from '@/lib/feedAbi'
 import { fmtDateTime, fmtDuration, fmtRate, parseRate } from '@/lib/math'
 import { Link } from '@/lib/router'
+import { RiskPanel } from './RiskPanel'
 import { AddressLink, Badge, Button, Card, Field, Notice, SectionTitle, Stat, TxStatus, inputClass } from './ui'
 
 export function Admin() {
@@ -97,6 +98,7 @@ export function Admin() {
           ) : null}
         </Card>
       </div>
+      <RiskPanel />
     </Wrap>
   )
 }

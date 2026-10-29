@@ -3,6 +3,18 @@ import { tenorAbi } from './tenorAbi'
 import { feedAbi } from './feedAbi'
 import { quoteTuple, type QuoteMsg } from './quote'
 
+export interface RiskParamsArg {
+  initialMarginBps: bigint
+  maintenanceBps: bigint
+  bandBps: bigint
+  markInterval: bigint
+  cureWindow: bigint
+  deliveryGrace: bigint
+  minTenor: bigint
+  maxNotionalUsd6: bigint
+  maxStaleness: bigint
+}
+
 export interface Call {
   to: Address
   data: Hex
@@ -39,6 +51,10 @@ const t = (to: Address) => ({
   settle: (id: bigint): Call => ({
     to,
     data: encodeFunctionData({ abi: tenorAbi, functionName: 'settle', args: [id] }),
+  }),
+  setRiskParams: (p: RiskParamsArg): Call => ({
+    to,
+    data: encodeFunctionData({ abi: tenorAbi, functionName: 'setRiskParams', args: [p] }),
   }),
   cancelNonce: (nonce: bigint): Call => ({
     to,

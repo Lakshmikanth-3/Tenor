@@ -9,9 +9,9 @@ Built with [Arc Studio](https://studio.arc.io)
 - **Hedge**: pick whether you will receive or pay USD, an amount, a maturity and physical or cash settlement. See live spot, the fair forward, the allowed band and the initial margin, plus a chart of hedged against unhedged outcomes.
 - **Dealer**: an allowlisted dealer signs a quote in their wallet and shares a link. No backend is involved.
 - **Take a quote**: the hedger opens the link, deposits margin and locks the rate.
-- **My trades**: mark-to-market, margin on both sides, margin health, margin-call countdown, and actions to mark, top up, fund a delivery leg, settle, close out and withdraw.
+- **My trades**: mark-to-market, margin on both sides, margin health, margin-call countdown, and actions to mark, top up, approve and fund a delivery leg, settle, close out and withdraw. Delivery tokens can be approved before maturity so funding a leg is one transaction.
 - **Refusal room**: eight attacks and one valid control, each run as a read-only call against the deployed contract.
-- **Admin / demo** (testnet only): the feed owner pushes a test EUR/USD price.
+- **Admin / demo** (testnet only): the feed owner pushes a test EUR/USD price, and the Tenor owner updates the delivery grace, cure window, mark interval and minimum tenor within the contract's bounds.
 
 The network can be switched between Arc Testnet and Arc Mainnet in the header. A red MAINNET badge and a wrong-network banner are shown when relevant.
 
