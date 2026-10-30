@@ -1,12 +1,12 @@
 import { useNet, useWallet } from '@/hooks/network'
-import { useYield } from '@/hooks/data'
+import { useYield, type VaultKind } from '@/hooks/data'
 import { useTx } from '@/hooks/useTx'
 import { tenorCalls } from '@/lib/calls'
 import { fmtToken } from '@/lib/math'
 import { Badge, Button, Notice, TxStatus } from './ui'
 
-/** Shown on testnet where the vault is the mock; mainnet would use the real USYC adapter. */
-export const vaultLabel = (isMainnet: boolean) => (isMainnet ? 'USYC' : 'Mock USYC (testnet)')
+/** What the configured vault is called in the UI. The testnet mock is always labelled as such. */
+export const vaultLabel = (kind: VaultKind | undefined) => (kind === 'usyc' ? 'Circle USYC' : kind === 'mock' ? 'Mock USYC (testnet)' : 'Yield vault')
 
 export const fmtApy = (bps: bigint) => `${(Number(bps) / 100).toFixed(2)}%`
 
@@ -21,6 +21,8 @@ export function YieldPanel() {
 
   if (!tenor || !d || !d.vault) return null
 
+  const usyc = d.kind === 'usyc'
+  const unit = usyc ? 'USYC' : 'shares'
   const toggle = () => run(d.mode ? 'Turn off yield' : 'Turn on yield', tenorCalls(tenor).setYieldMode(!d.mode))
   const sweep = () => run('Move idle USDC into vault', tenorCalls(tenor).sweepToYield())
   const canToggle = !!address && !busy && (d.mode || d.active)
@@ -30,10 +32,11 @@ export function YieldPanel() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="display text-base font-semibold text-ink" id="yield-toggle-label">
-            Earn yield on idle margin
+            Earn yield on idle margin ({vaultLabel(d.kind)})
           </div>
           <p className="mt-0.5 text-xs text-muted">
-            Free margin is held in {vaultLabel(net.isMainnet)} at {fmtApy(d.apyBps)} APY. Margin locked in a trade stays plain USDC and earns nothing.
+            Free margin is held in {vaultLabel(d.kind)}
+            {d.kind === 'mock' ? ` at ${fmtApy(d.apyBps)} APY` : ''}. Margin locked in a trade stays plain USDC and earns nothing.
           </p>
         </div>
         <button
@@ -54,24 +57,40 @@ export function YieldPanel() {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div>
-          <div className="label">In vault</div>
-          <div className="num mt-1 font-semibold">{fmtToken(d.inVault)}</div>
+          <div className="label">{usyc ? 'USYC shares' : 'Vault shares'}</div>
+          <div className="num mt-1 font-semibold">{fmtToken(d.shares)}</div>
+          <div className="num text-xs text-muted">{unit}</div>
+        </div>
+        <div>
+          <div className="label">Value (free margin)</div>
+          <div className="num mt-1 font-semibold">{fmtToken(d.free)}</div>
+          <div className="num text-xs text-muted">USDC, plain + vault</div>
         </div>
         <div>
           <div className="label">Yield earned</div>
           <div className="num mt-1 font-semibold text-success">{fmtToken(d.earned)}</div>
+          <div className="num text-xs text-muted">USDC</div>
         </div>
-        <div>
-          <div className="label">Idle, not yet in vault</div>
-          <div className="num mt-1 font-semibold">{fmtToken(d.plain)}</div>
-        </div>
+        {usyc ? (
+          <div>
+            <div className="label">USYC price</div>
+            <div className="num mt-1 font-semibold">{d.usycPrice !== undefined ? fmtToken(d.usycPrice) : '–'}</div>
+            <div className="num text-xs text-muted">USDC per USYC</div>
+          </div>
+        ) : (
+          <div>
+            <div className="label">Idle, not yet in vault</div>
+            <div className="num mt-1 font-semibold">{fmtToken(d.plain)}</div>
+            <div className="num text-xs text-muted">USDC</div>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {d.mode ? <Badge tone="good">Yield on</Badge> : <Badge>Yield off</Badge>}
-        <Badge tone="info">{vaultLabel(net.isMainnet)}</Badge>
+        <Badge tone="info">{vaultLabel(d.kind)}</Badge>
         {d.mode && d.active && d.plain > 0n ? (
           <Button onClick={sweep} loading={busy} className="ml-auto">
             Move idle USDC into vault
@@ -79,14 +98,19 @@ export function YieldPanel() {
         ) : null}
       </div>
 
+      {usyc ? (
+        <p className="mt-3 text-xs text-muted">
+          USYC is permissioned; testnet adapter allowlisted by Circle; 1 USDC/day Teller limit. Deposits over the limit simply stay plain USDC and can be moved
+          into USYC later.
+        </p>
+      ) : null}
       {!d.active && !d.mode ? (
         <p className="mt-3 text-xs text-muted">New yield deposits are paused by the contract owner. Withdrawals still work.</p>
       ) : null}
-      {d.shortfall > 0n ? (
+      {d.kind === 'mock' && d.shortfall > 0n ? (
         <div className="mt-3">
           <Notice tone="warn" title="Demo vault reserve is not fully funded">
-            The testnet vault only pays accrued yield out of USDC that was funded to it. Redeeming past that can fail until the vault owner tops up the reserve.
-            Settlement, marking and close-out never wait on the vault.
+            The testnet mock vault only pays accrued yield out of USDC that was funded to it. Settlement, marking and close-out never wait on the vault.
           </Notice>
         </div>
       ) : null}

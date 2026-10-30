@@ -34,7 +34,7 @@ export function VaultPanel() {
     },
   })
 
-  if (net.isMainnet || !vault || !y.data) return null
+  if (net.isMainnet || !vault || !y.data || !('kind' in y.data) || y.data.kind !== 'mock') return null
 
   const isOwner = !!address && !!y.data.owner && address.toLowerCase() === y.data.owner.toLowerCase()
   const value = parseToken(amount) ?? 0n
@@ -48,7 +48,7 @@ export function VaultPanel() {
   return (
     <Card className="space-y-5">
       <SectionTitle hint={isOwner ? <Badge tone="good">You own this vault</Badge> : <Badge tone="warn">Owner only</Badge>}>
-        {vaultLabel(false)}
+        {vaultLabel('mock')}
       </SectionTitle>
       <div className="grid grid-cols-3 gap-5">
         <Stat label="APY" value={fmtApy(y.data.apyBps)} sub="fixed, simple interest" />

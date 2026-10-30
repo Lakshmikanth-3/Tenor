@@ -3,6 +3,7 @@ import { erc20Abi, type Address, type ContractFunctionReturnType } from 'viem'
 import { tenorAbi } from '@/lib/tenorAbi'
 import { feedAbi } from '@/lib/feedAbi'
 import { vaultAbi } from '@/lib/vaultAbi'
+import { usycAdapterAbi } from '@/lib/usycAdapterAbi'
 import { decodeRevert } from '@/lib/errors'
 import { nowSec } from '@/lib/math'
 import { useNet } from './network'
@@ -103,7 +104,12 @@ export function useBalances(account?: Address) {
   })
 }
 
-/** Yield-bearing margin state for one account, plus the vault's APY and reserve. Idle when no vault is configured. */
+export type VaultKind = 'usyc' | 'mock' | 'unknown'
+
+/**
+ * Yield-bearing margin state for one account. The vault is whatever the Tenor owner configured: the Circle USYC adapter
+ * (detected by its teller()) or the testnet mock. Idle when no vault is configured.
+ */
 export function useYield(account?: Address) {
   const { net, client } = useNet()
   return useQuery({
@@ -112,34 +118,52 @@ export function useYield(account?: Address) {
     refetchInterval: 8_000,
     queryFn: async () => {
       const tenor = net.tenor as Address
-      const read = <N extends 'yieldVault' | 'yieldActive'>(functionName: N) => client.readContract({ address: tenor, abi: tenorAbi, functionName })
-      const [vault, active] = await Promise.all([read('yieldVault'), read('yieldActive')])
-      const none = vault === '0x0000000000000000000000000000000000000000'
-      if (none) return { vault: undefined, active: false, mode: false, plain: 0n, inVault: 0n, earned: 0n, principal: 0n, apyBps: 0n, shortfall: 0n, owner: undefined }
-      const holder = account as Address
       const t = { address: tenor, abi: tenorAbi } as const
-      const zero = <T,>(v: T) => (account ? undefined : Promise.resolve(v))
-      const [mode, inVault, earned, principal, plain, apyBps, shortfall, owner] = await Promise.all([
-        zero(false) ?? client.readContract({ ...t, functionName: 'yieldMode', args: [holder] }),
-        zero(0n) ?? client.readContract({ ...t, functionName: 'vaultValueOf', args: [holder] }),
-        zero(0n) ?? client.readContract({ ...t, functionName: 'yieldEarned', args: [holder] }),
-        zero(0n) ?? client.readContract({ ...t, functionName: 'yieldPrincipal', args: [holder] }),
-        zero(0n) ?? client.readContract({ ...t, functionName: 'marginOf', args: [holder] }),
-        client.readContract({ address: vault, abi: vaultAbi, functionName: 'apyBps' }),
-        client.readContract({ address: vault, abi: vaultAbi, functionName: 'reserveShortfall' }),
-        client.readContract({ address: vault, abi: vaultAbi, functionName: 'owner' }),
+      const [vault, active] = await Promise.all([
+        client.readContract({ ...t, functionName: 'yieldVault' }),
+        client.readContract({ ...t, functionName: 'yieldActive' }),
       ])
+      if (vault === '0x0000000000000000000000000000000000000000') return { vault: undefined }
+      const holder = account as Address
+      const acct = <T,>(zero: T, read: () => Promise<T>): Promise<T> => (account ? read() : Promise.resolve(zero))
+      const adapter = { address: vault, abi: usycAdapterAbi } as const
+      const mockV = { address: vault, abi: vaultAbi } as const
+      const kind: VaultKind = await client.readContract({ ...adapter, functionName: 'teller' }).then(
+        () => 'usyc' as const,
+        () => client.readContract({ ...mockV, functionName: 'apyBps' }).then(() => 'mock' as const, () => 'unknown' as const),
+      )
+      const [mode, shares, free, inVault, earned, plain] = await Promise.all([
+        acct(false, () => client.readContract({ ...t, functionName: 'yieldMode', args: [holder] })),
+        acct(0n, () => client.readContract({ ...t, functionName: 'vaultShares', args: [holder] })),
+        acct(0n, () => client.readContract({ ...t, functionName: 'freeMarginOf', args: [holder] })),
+        acct(0n, () => client.readContract({ ...t, functionName: 'vaultValueOf', args: [holder] })),
+        acct(0n, () => client.readContract({ ...t, functionName: 'yieldEarned', args: [holder] })),
+        acct(0n, () => client.readContract({ ...t, functionName: 'marginOf', args: [holder] })),
+      ])
+      // USDC paid for 1 whole USYC (6 decimals) at the Teller's price, read through the adapter.
+      const usycPrice = kind === 'usyc' ? await client.readContract({ ...adapter, functionName: 'convertToAssets', args: [1_000_000n] }).catch(() => undefined) : undefined
+      const mock =
+        kind === 'mock'
+          ? await Promise.all([
+              client.readContract({ ...mockV, functionName: 'apyBps' }),
+              client.readContract({ ...mockV, functionName: 'reserveShortfall' }),
+              client.readContract({ ...mockV, functionName: 'owner' }),
+            ])
+          : undefined
       return {
         vault,
+        kind,
         active,
-        mode: (mode) ?? false,
-        plain: (plain) ?? 0n,
-        inVault: (inVault) ?? 0n,
-        earned: (earned) ?? 0n,
-        principal: (principal) ?? 0n,
-        apyBps,
-        shortfall,
-        owner,
+        mode,
+        shares,
+        free,
+        inVault,
+        earned,
+        plain,
+        usycPrice,
+        apyBps: mock?.[0] ?? 0n,
+        shortfall: mock?.[1] ?? 0n,
+        owner: mock?.[2],
       }
     },
   })

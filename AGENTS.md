@@ -39,6 +39,7 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 - Tenor v2: `0xfa9d0a455959c5fa6e57b4e3fdee9b062bacc3ee`, deploy block 69655019, tx `0xa5307afdf43ac3ab3e167292aba851170ae67829a08e038204ccfed776af78c7`. v1 above stays deployed and untouched; v1 metadata is saved as `contracts/contract-metadata/Tenor.v1.json`.
 - MockYieldVault ("Mock USYC (testnet)", 4.5%/yr): `0xf724adeaa22f546b84e796c09734e36f13d9dd4b`, tx `0x3e3d715b218add114ef10b7c7bcebc66294d5d44f411c4003ee897687d078b4a`. Owner `0x43DD...EFDC`. It needs USDC funded to its reserve (fundYield) to pay accrued yield.
+- Live yield vault of v2 is now the Circle USYC adapter `0x3b636e4ce4d4991115cba54f57ec451702371179` (source `contracts/adapters/USYCYieldVault.sol`, written outside Studio, Circle-allowlisted, 1 USDC/day Teller limit). The mock vault above is no longer used. The app detects the vault kind (adapter `teller()` vs mock `apyBps()`) in `useYield`. Evidence: `docs/EVIDENCE.md`.
 - Constructor gained a 7th arg `yieldVault_` (zero = off); defaults are now cureWindow 300, deliveryGrace 900. Existing tests pin 120/120 in `Tenor.Base.t.sol` so v1 behaviour tests are unchanged.
 - Locked trade margin is always plain USDC; mark/closeOut/settle never touch the vault. `marginOf` is plain only; `freeMarginOf` = plain + vault value; `yieldEarned` = realised + unrealised.
 - Tests: `forge test --match-path 'contracts/test/Tenor.*t.sol'` (245 tests, 113 new for yield).
