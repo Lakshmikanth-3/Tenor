@@ -8,11 +8,13 @@ import { QuotePage } from '@/components/QuotePage'
 import { Trades } from '@/components/Trades'
 import { Refusal } from '@/components/Refusal'
 import { Admin } from '@/components/Admin'
+import { Proof } from '@/components/Proof'
 import { Empty } from '@/components/ui'
 
 function Routes() {
   const { path } = useLocation()
   const { net } = useNet()
+  if (path.startsWith('/proof')) return <Proof />
   if (!net.tenor) {
     return (
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-8">

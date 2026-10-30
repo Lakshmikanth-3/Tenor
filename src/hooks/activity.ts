@@ -7,7 +7,21 @@ export type TenorLog = GetContractEventsReturnType<typeof tenorAbi>[number]
 
 /** Every getLogs request spans fewer than 10,000 blocks. */
 const WINDOW = 9_000n
-const CONCURRENCY = 4
+const CONCURRENCY = 2
+const RETRIES = 6
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** The public RPC rate-limits bursts of getLogs; back off and retry rather than failing the whole scan. */
+async function withBackoff<T>(fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (attempt >= RETRIES) throw e
+      await sleep(500 * 2 ** attempt)
+    }
+  }
+}
 
 interface Cache {
   next: bigint
@@ -26,7 +40,7 @@ export async function scanLogs(client: PublicClient, tenor: Address, from: bigin
     const batch = await Promise.all(
       windows.slice(i, i + CONCURRENCY).map(async ([fromBlock, toBlock]) => {
         // Filter by address only. A topic0 list of every event is rejected by the Arc RPC as "range too large".
-        const raw = await client.getLogs({ address: tenor, fromBlock, toBlock })
+        const raw = await withBackoff(() => client.getLogs({ address: tenor, fromBlock, toBlock }))
         return parseEventLogs({ abi: tenorAbi, logs: raw })
       }),
     )

@@ -46,6 +46,7 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 ## Web app
 
+- `/proof` (Proof page, `src/components/Proof.tsx`, data in `src/hooks/proof.ts`) reads Tenor events from the deploy block via `useActivity` (getLogs windows under 10,000 blocks, 2 at a time with backoff because the public RPC rate-limits). `FundFromAnyChain` is links only.
 - Pages (path routing, `src/App.tsx`): `/` Hedge, `/trades`, `/dealer`, `/quote?q=...` (signed dealer quote link), `/refusal`, `/admin` (testnet only).
 - Network is switchable (testnet or mainnet) in the header; addresses come from `VITE_*` env vars (see README). Tenor is not deployed on mainnet yet.
 - `src/lib/refusal.ts` runs the refusal scenarios as `eth_call` with state overrides. Storage slots are from `forge inspect Tenor storageLayout`; regenerate them if the contract layout changes.

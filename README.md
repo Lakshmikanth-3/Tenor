@@ -66,6 +66,8 @@ Built end to end with [Arc Studio](https://studio.arc.io) for Arc Microgrants.
 - Two audit passes and Slither inside Arc Studio, no High findings.
 - **Refusal room**: eight attacks run live against the deployed contract and refused by name: `StalePrice`, `OffMarketRate`, `NonceUsed` (replayed quote), `BadSignature` (forged quote), `QuoteExpired`, `MarginLocked`, `AlreadySettled`, `NotMatured`, plus one valid control that passes.
 - USYC adapter: 17/17 local end-to-end checks against the real Tenor v2 code.
+- **Proof page** in the app: the contracts with explorer links, every Tenor event since deployment (filterable, newest first), live totals (trades, notional, delivered amounts, margin held in USYC), all read from the chain in your browser. It also works on mainnet and shows a notice until Tenor is deployed there.
+- **Fund from any chain**: every margin deposit panel and the fund-leg step link to Circle's CCTP and Gateway docs (and the testnet faucet) and show your USDC and EURC balances on Arc. Links only, no extra contract calls.
 
 ---
 

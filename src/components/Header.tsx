@@ -18,6 +18,7 @@ const NAV = [
   { to: '/trades', label: 'My trades' },
   { to: '/dealer', label: 'Dealer' },
   { to: '/refusal', label: 'Refusal room' },
+  { to: '/proof', label: 'Proof' },
   { to: '/admin', label: 'Admin / demo', testnetOnly: true },
 ]
 

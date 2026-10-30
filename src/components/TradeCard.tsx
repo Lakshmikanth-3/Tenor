@@ -8,6 +8,7 @@ import { useTx } from '@/hooks/useTx'
 import { approveCall, tenorCalls } from '@/lib/calls'
 import { ceilBps, eurcFor, fmtDate, fmtDateTime, fmtDuration, fmtRate, fmtToken, hedgerMtm, parseToken, type Side } from '@/lib/math'
 import { Badge, Button, Card, Stat, TxLink, TxStatus, inputClass } from './ui'
+import { FundFromAnyChain } from './FundFromAnyChain'
 
 const STATUS = ['None', 'Open', 'Delivered', 'Cash settled', 'Delivery failed', 'Closed out'] as const
 
@@ -152,6 +153,8 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
           {matured && !(t.usdLegFunded && t.eurLegFunded) ? ` Missing legs fail ${fmtDuration(Math.max(0, Number(t.maturity) + Number(t.deliveryGrace) - now))} after maturity grace starts.` : ''}
         </p>
       ) : null}
+
+      {canFund ? <FundFromAnyChain className="!p-4" /> : null}
 
       <div className="flex flex-wrap items-end gap-3">
         {open ? (

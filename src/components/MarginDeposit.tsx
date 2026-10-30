@@ -5,6 +5,7 @@ import { useTx } from '@/hooks/useTx'
 import { approveCall, tenorCalls } from '@/lib/calls'
 import { fmtToken, parseToken } from '@/lib/math'
 import { Button, Field, TxStatus, inputClass } from './ui'
+import { FundFromAnyChain } from './FundFromAnyChain'
 
 /** Deposit USDC into the Tenor margin balance (approve, then depositMargin). `needed` pre-fills the shortfall. */
 export function MarginDeposit({ needed }: { needed?: bigint }) {
@@ -50,6 +51,7 @@ export function MarginDeposit({ needed }: { needed?: bigint }) {
         </div>
       </Field>
       <TxStatus state={state} />
+      <FundFromAnyChain className="mt-4 !p-4" />
     </div>
   )
 }
