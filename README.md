@@ -9,6 +9,7 @@ Built end to end with [Arc Studio](https://studio.arc.io) for Arc Microgrants.
 | | |
 | --- | --- |
 | Live app | https://arc-studio-e5ec61eb5f7847d88423d315.vercel.app |
+| Demo video (pitch + live mainnet demo) | https://youtu.be/gX-JjdNhwGQ |
 | Arc Studio project | https://studio.arc.io/app/e5ec61eb-5f78-47d8-8423-d315eba31d29 |
 | Evidence (every contract and tx) | [docs/EVIDENCE.md](docs/EVIDENCE.md) |
 | Builder | https://github.com/Lakshmikanth-3 |
