@@ -6,16 +6,6 @@ import { clsx } from 'clsx'
 import { Link, useLocation } from '@/lib/router'
 import { useNet } from '@/hooks/network'
 
-function Mark() {
-  return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden>
-      <rect width="26" height="26" rx="7" fill="#122d45" />
-      <path d="M7 9.5h12M7 13h12M7 16.5h7" stroke="#acc6e9" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="19" cy="16.5" r="1.6" fill="#acc6e9" />
-    </svg>
-  )
-}
-
 const NAV = [
   { to: '/business', label: 'Business', also: ['/', '/hedge', '/quote'] },
   { to: '/dealer-desk', label: 'Dealer', also: ['/dealer'] },
@@ -49,7 +39,7 @@ export function Header() {
       </div>
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link to="/" className="flex items-center gap-2.5">
-          <Mark />
+          <img src="/logo.png" alt="Tenor logo" className="h-9 w-9 rounded-lg" />
           <span className="display text-xl font-semibold text-ink">Tenor</span>
         </Link>
         <nav aria-label="Primary" className="order-3 -mx-1 flex w-full gap-1 overflow-x-auto md:order-none md:w-auto md:flex-1">
