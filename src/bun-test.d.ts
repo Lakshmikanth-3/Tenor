@@ -14,6 +14,8 @@ declare module 'bun:test' {
     toBeTruthy(): void
     toBeFalsy(): void
     toHaveLength(n: number): void
+    toThrow(): void
+    not: Matchers
   }
   export const expect: (actual: unknown) => Matchers
 }

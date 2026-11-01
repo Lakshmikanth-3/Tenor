@@ -183,6 +183,17 @@ function insufficient(shortBy: bigint, symbol: string): Plan {
 }
 
 /**
+ * Chains where wallet_sendCalls batches are never used. On Arc, MetaMask smart-account (EIP-7702) batches such as deposit + open
+ * revert onchain while the same calls sent one by one succeed, so the sequential flow is always used there.
+ */
+export const ATOMIC_DISABLED_CHAIN_IDS: readonly number[] = [5042002, 5042]
+
+export const atomicBatchingAllowed = (chainId: number): boolean => !ATOMIC_DISABLED_CHAIN_IDS.includes(chainId)
+
+/** True only when batching is allowed on this chain AND the wallet reports atomic support for it. */
+export const canBatchAtomically = (caps: unknown, chainId: number): boolean => atomicBatchingAllowed(chainId) && supportsAtomic(caps, chainId)
+
+/**
  * EIP-5792 capability check. Handles both response shapes: the current `atomic.status` and the older `atomicBatch.supported`,
  * either for one chain directly or keyed by chain id (decimal or hex).
  */

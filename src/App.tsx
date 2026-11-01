@@ -9,11 +9,14 @@ import { Trades } from '@/components/Trades'
 import { Refusal } from '@/components/Refusal'
 import { Admin } from '@/components/Admin'
 import { Proof } from '@/components/Proof'
+import { RoleDashboard } from '@/components/Dashboard'
+import { useRole } from '@/hooks/useRole'
 import { Empty } from '@/components/ui'
 
 function Routes() {
   const { path } = useLocation()
   const { net } = useNet()
+  const [role] = useRole()
   if (path.startsWith('/proof')) return <Proof />
   if (!net.tenor) {
     return (
@@ -26,10 +29,13 @@ function Routes() {
   }
   if (path.startsWith('/quote')) return <QuotePage />
   if (path.startsWith('/trades')) return <Trades />
+  if (path.startsWith('/dealer-desk')) return <RoleDashboard role="dealer" />
   if (path.startsWith('/dealer')) return <Dealer />
   if (path.startsWith('/refusal')) return <Refusal />
   if (path.startsWith('/admin')) return <Admin />
-  return <Hedge />
+  if (path.startsWith('/hedge')) return <Hedge />
+  if (path.startsWith('/business')) return <RoleDashboard role="business" />
+  return <RoleDashboard role={role} />
 }
 
 export default function App() {

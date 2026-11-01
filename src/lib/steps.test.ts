@@ -5,6 +5,8 @@ import type { QuoteMsg } from './quote'
 import {
   defaultMaturity,
   marginShortfall,
+  atomicBatchingAllowed,
+  canBatchAtomically,
   maturityWarning,
   planDeposit,
   planFundLeg,
@@ -187,5 +189,24 @@ describe('dealer maturity', () => {
     expect(maturityWarning({ maturity: now + 500, now, minTenor: 300 })).toContain('5 minutes')
     expect(maturityWarning({ maturity: now + 600, now, minTenor: 300 })).toBeUndefined()
     expect(maturityWarning({ maturity: defaultMaturity(now, false), now, minTenor: 300 })).toBeUndefined()
+  })
+})
+
+describe('batching is off on Arc', () => {
+  const claims = { atomic: { status: 'supported' } }
+  test('never allowed on Arc testnet or mainnet', () => {
+    expect(atomicBatchingAllowed(5042002)).toBe(false)
+    expect(atomicBatchingAllowed(5042)).toBe(false)
+  })
+  test('a wallet that claims atomic support still gets the sequential flow on Arc', () => {
+    expect(canBatchAtomically({ '5042002': claims }, 5042002)).toBe(false)
+    expect(canBatchAtomically({ '5042': claims }, 5042)).toBe(false)
+  })
+  test('other chains keep batching when the wallet supports it', () => {
+    expect(canBatchAtomically({ '84532': claims }, 84532)).toBe(true)
+    expect(canBatchAtomically({}, 84532)).toBe(false)
+  })
+  test('on Arc every multi-step plan is one popup per step', () => {
+    for (const n of [2, 3]) expect(popupCount(n, canBatchAtomically({ '5042002': claims }, 5042002))).toBe(n)
   })
 })

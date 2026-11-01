@@ -31,7 +31,7 @@ export function Admin() {
     return (
       <Wrap>
         <Notice tone="info" title="Not available on mainnet">
-          Mainnet reads the Chainlink EUR/USD feed. Nobody can push prices there. <Link className="underline" to="/">Back to Hedge</Link>
+          Mainnet reads the Chainlink EUR/USD feed. Nobody can push prices there. <Link className="underline" to="/hedge">Back to Hedge</Link>
         </Notice>
       </Wrap>
     )

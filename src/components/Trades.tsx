@@ -45,7 +45,7 @@ export function Trades() {
           {trades.isLoading ? <Card>Loading trades from {net.label}…</Card> : null}
           {trades.data && trades.data.length === 0 ? (
             <Empty title="No trades yet">
-              Open a dealer quote to create one. <Link className="font-semibold text-accent-hover underline" to="/">Start a hedge</Link>
+              Open a dealer quote to create one. <Link className="font-semibold text-accent-hover underline" to="/hedge">Start a hedge</Link>
             </Empty>
           ) : null}
           {params.data && trades.data

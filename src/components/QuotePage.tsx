@@ -9,6 +9,7 @@ import { tenorAbi } from '@/lib/tenorAbi'
 import { ceilBps, eurcFor, fmtDate, fmtDateTime, fmtDuration, fmtRate, fmtToken, nowSec } from '@/lib/math'
 import { decodeQuote, quoteTypedData } from '@/lib/quote'
 import { Link, useLocation } from '@/lib/router'
+import { rememberQuote } from '@/lib/lastQuote'
 import { NETWORKS } from '@/lib/networks'
 import { AddressLink, Badge, Button, Card, Notice, SectionTitle, TxStatus } from './ui'
 import { FundFromAnyChain } from './FundFromAnyChain'
@@ -39,6 +40,10 @@ export function QuotePage() {
     return raw ? decodeQuote(raw) : undefined
   }, [qs])
   const open = useTx()
+  const rawQuote = qs.get('q')
+  useEffect(() => {
+    if (rawQuote && link) rememberQuote(`/quote?q=${rawQuote}`)
+  }, [rawQuote, link])
   const params = useParams()
   const [now, setNow] = useState(nowSec())
   useEffect(() => {
@@ -78,7 +83,7 @@ export function QuotePage() {
       <Wrap>
         <Notice tone="bad" title="This quote link could not be read">
           The link is incomplete or damaged. Ask the dealer to send it again, or go back to the{' '}
-          <Link className="font-semibold text-accent-hover underline underline-offset-2" to="/">
+          <Link className="font-semibold text-accent-hover underline underline-offset-2" to="/hedge">
             Hedge page
           </Link>
           .

@@ -65,6 +65,9 @@ export function StepTracker({ steps, state, atomic }: { steps: TrackedStep[]; st
           )
         })}
       </ol>
+      {!batched && shown.length > 1 ? (
+        <p className="mt-2 text-xs text-muted">Each step is confirmed separately in your wallet. Arc runs these one at a time, because batched smart-account transactions revert there.</p>
+      ) : null}
       <div className={clsx('mt-3 border-t border-line pt-2 text-xs', mismatch ? 'font-semibold text-danger' : 'text-muted')} role={mismatch ? 'alert' : undefined}>
         {mismatch && required
           ? `Wallet account changed. Active: ${shortAddr(address ?? '')}. Required: ${shortAddr(required)}. Switch back before continuing.`

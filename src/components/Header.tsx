@@ -1,4 +1,7 @@
+import { useEffect } from 'react'
 import { WalletButton } from './WalletButton'
+import { RoleSwitch } from './RoleSwitch'
+import { useRole } from '@/hooks/useRole'
 import { clsx } from 'clsx'
 import { Link, useLocation } from '@/lib/router'
 import { useNet } from '@/hooks/network'
@@ -14,9 +17,9 @@ function Mark() {
 }
 
 const NAV = [
-  { to: '/', label: 'Hedge' },
+  { to: '/business', label: 'Business', also: ['/', '/hedge', '/quote'] },
+  { to: '/dealer-desk', label: 'Dealer', also: ['/dealer'] },
   { to: '/trades', label: 'My trades' },
-  { to: '/dealer', label: 'Dealer' },
   { to: '/refusal', label: 'Refusal room' },
   { to: '/proof', label: 'Proof' },
   { to: '/admin', label: 'Admin / demo', testnetOnly: true },
@@ -26,6 +29,12 @@ export function Header() {
   const { net, setKey } = useNet()
   const { path } = useLocation()
   const items = NAV.filter((n) => !n.testnetOnly || !net.isMainnet)
+  const [role, setRole] = useRole()
+  // Opening a side's dashboard directly (a bookmark, a link) also switches the role switch to that side.
+  useEffect(() => {
+    if (path.startsWith('/business') && role !== 'business') setRole('business')
+    else if (path.startsWith('/dealer-desk') && role !== 'dealer') setRole('dealer')
+  }, [path, role, setRole])
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-[#f9f9fc]/90 backdrop-blur">
       {net.isMainnet ? (
@@ -33,6 +42,11 @@ export function Header() {
           Arc mainnet selected. Transactions move real funds and cannot be reversed.
         </div>
       ) : null}
+      <div className="border-b border-line bg-surface/60">
+        <div className="mx-auto flex max-w-6xl items-center px-4 py-1.5">
+          <RoleSwitch />
+        </div>
+      </div>
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <Link to="/" className="flex items-center gap-2.5">
           <Mark />
@@ -40,7 +54,7 @@ export function Header() {
         </Link>
         <nav aria-label="Primary" className="order-3 -mx-1 flex w-full gap-1 overflow-x-auto md:order-none md:w-auto md:flex-1">
           {items.map((n) => {
-            const active = n.to === '/' ? path === '/' : path.startsWith(n.to)
+            const active = [n.to, ...(n.also ?? [])].some((m) => (m === '/' ? path === '/' : path.startsWith(m)))
             return (
               <Link
                 key={n.to}
