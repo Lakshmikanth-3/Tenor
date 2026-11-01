@@ -1,4 +1,4 @@
-import { ConnectKitButton } from 'connectkit'
+import { WalletButton } from './WalletButton'
 import { clsx } from 'clsx'
 import { Link, useLocation } from '@/lib/router'
 import { useNet } from '@/hooks/network'
@@ -75,7 +75,7 @@ export function Header() {
               </button>
             ))}
           </div>
-          <ConnectKitButton showBalance={false} />
+          <WalletButton />
         </div>
       </div>
     </header>

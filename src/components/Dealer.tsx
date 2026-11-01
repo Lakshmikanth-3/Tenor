@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ConnectKitButton } from 'connectkit'
-import { useSignTypedData, useSwitchChain } from 'wagmi'
+import { WalletButton } from './WalletButton'
+import { useConfig, useSignTypedData, useSwitchChain } from 'wagmi'
+import { getAccount } from 'wagmi/actions'
 import { useNet, useWallet } from '@/hooks/network'
 import { useBalances, useIsDealer, useParams, useQuoteView } from '@/hooks/data'
 import { useShareLink } from '@/hooks/useShareLink'
 import { useTx } from '@/hooks/useTx'
 import { tenorCalls } from '@/lib/calls'
-import { ceilBps, fmtDate, fmtRate, fmtToken, nowSec, parseRate, parseToken, type Side } from '@/lib/math'
+import { defaultMaturity, maturityWarning } from '@/lib/steps'
+import { ceilBps, fmtDate, shortAddr, fmtRate, fmtToken, nowSec, parseRate, parseToken, type Side } from '@/lib/math'
 import { encodeQuote, quoteTypedData, randomNonce, type QuoteMsg } from '@/lib/quote'
 import { useLocation } from '@/lib/router'
 import { decodeRevert, isUserRejection } from '@/lib/errors'
@@ -29,6 +31,7 @@ export function Dealer() {
   const bal = useBalances(address)
   const { signTypedDataAsync, isPending: signing } = useSignTypedData()
   const { switchChainAsync } = useSwitchChain()
+  const config = useConfig()
   const cancel = useTx()
 
   const [side, setSide] = useState<Side>(qs.get('side') === '1' ? 1 : 0)
@@ -38,12 +41,12 @@ export function Dealer() {
   })
   const [maturityStr, setMaturityStr] = useState(() => {
     const m = Number(qs.get('m'))
-    return toLocalInput(Number.isFinite(m) && m > nowSec() ? m : nowSec() + 30 * 86400)
+    return toLocalInput(Number.isFinite(m) && m > nowSec() ? m : defaultMaturity(nowSec(), net.isMainnet))
   })
   const [cash, setCash] = useState(qs.get('cash') === '1')
   const [rateStr, setRateStr] = useState('')
   const [marginBps, setMarginBps] = useState('')
-  const [expiryMin, setExpiryMin] = useState('30')
+  const [expiryMin, setExpiryMin] = useState(net.isMainnet ? '30' : '15')
   const [cancelNonceStr, setCancelNonceStr] = useState('')
   const [path, setPath] = useState<string>()
   const [signError, setSignError] = useState<string>()
@@ -60,6 +63,18 @@ export function Dealer() {
   const inBand = !!quote && !!rate && rate >= quote.bandLow && rate <= quote.bandHigh
   const minBps = params.data?.initialMarginBps ?? 0n
   const freeOk = !!bal.data && bal.data.freeUsdc >= need
+
+  const minTenorSec = Number(params.data?.minTenor ?? 0n)
+  const maturityNote = Number.isFinite(maturity) ? maturityWarning({ maturity, now: nowSec(), minTenor: minTenorSec }) : undefined
+  const maturityLocal = Number.isFinite(maturity)
+    ? new Date(maturity * 1000).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })
+    : ''
+  const latestOpen = Number.isFinite(maturity) ? maturity - minTenorSec : 0
+  const expiryAt = nowSec() + Math.max(1, Number(expiryMin) || 30) * 60
+  const expiryNote =
+    params.data && Number.isFinite(maturity) && expiryAt > latestOpen
+      ? `A hedger can only open this until ${new Date(latestOpen * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}, because after that the maturity is closer than the minimum tenor. The quote itself says it is valid longer.`
+      : undefined
 
   const issues = useMemo(() => {
     const out: string[] = []
@@ -86,9 +101,14 @@ export function Dealer() {
       nonce: randomNonce(),
       cashSettled: cash,
     }
+    const active = getAccount(config).address
+    if (active && active.toLowerCase() !== address.toLowerCase()) {
+      setSignError(`Your wallet is on ${shortAddr(active)}, but this quote is for ${shortAddr(address)}. Switch back to ${shortAddr(address)} in your wallet, then sign again.`)
+      return
+    }
     try {
       await switchChainAsync({ chainId: net.chainId })
-      const signature = await signTypedDataAsync(quoteTypedData(net.chainId, net.tenor, msg))
+      const signature = await signTypedDataAsync({ ...quoteTypedData(net.chainId, net.tenor, msg), account: address })
       setPath(`/quote?q=${encodeQuote({ chainId: net.chainId, tenor: net.tenor, quote: msg, signature })}`)
     } catch (e) {
       if (!isUserRejection(e)) setSignError(decodeRevert(e).message)
@@ -101,7 +121,7 @@ export function Dealer() {
         <Card className="text-center">
           <p className="mb-4 text-ink-2">Connect the allowlisted dealer wallet to sign quotes.</p>
           <div className="flex justify-center">
-            <ConnectKitButton />
+            <WalletButton />
           </div>
         </Card>
       </Shell>
@@ -135,7 +155,16 @@ export function Dealer() {
             <Field label="Notional (USDC)">
               <input className={inputClass} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </Field>
-            <Field label="Maturity">
+            <Field
+              label="Maturity (your local time)"
+              hint={
+                <>
+                  {maturityLocal ? <span className="block text-ink-2">{maturityLocal}</span> : null}
+                  {maturityNote ? <span className="mt-1 block font-medium text-warn">{maturityNote}</span> : null}
+                  {expiryNote ? <span className="mt-1 block">{expiryNote}</span> : null}
+                </>
+              }
+            >
               <input type="datetime-local" className={inputClass} value={maturityStr} onChange={(e) => setMaturityStr(e.target.value)} />
             </Field>
             <Field

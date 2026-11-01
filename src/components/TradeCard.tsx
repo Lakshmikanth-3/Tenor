@@ -9,6 +9,8 @@ import { approveCall, tenorCalls } from '@/lib/calls'
 import { ceilBps, eurcFor, fmtDate, fmtDateTime, fmtDuration, fmtRate, fmtToken, hedgerMtm, parseToken, type Side } from '@/lib/math'
 import { Badge, Button, Card, Stat, TxLink, TxStatus, inputClass } from './ui'
 import { FundFromAnyChain } from './FundFromAnyChain'
+import { StepTracker } from './StepTracker'
+import { APPROVAL_NOTE, planFundLeg, planTopUp, planWithdrawAll, reusableApproval, settleIsNext } from '@/lib/steps'
 
 const STATUS = ['None', 'Open', 'Delivered', 'Cash settled', 'Delivery failed', 'Closed out'] as const
 
@@ -17,7 +19,7 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
   const now = useNow()
   const t = row.trade
   const bal = useBalances(me)
-  const { state, run, busy } = useTx()
+  const { state, run, runSteps, busy, atomic } = useTx()
   const [topUpAmt, setTopUpAmt] = useState('')
   const tenor = net.tenor as Address
 
@@ -45,6 +47,7 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
   const legToken = sellsUsd ? net.usdc : (net.eurc as Address)
   const legAmount = sellsUsd ? t.notionalUsd6 : t.eurAmount6
   const canFund = open && !t.cashSettled && matured && !myLegFunded
+  const canSettle = open && matured && (t.cashSettled || (t.usdLegFunded && t.eurLegFunded) || now >= Number(t.maturity) + Number(t.deliveryGrace))
   const legSymbol = sellsUsd ? 'USDC' : 'EURC'
   const approved = !!bal.data && (sellsUsd ? bal.data.allowUsdc : bal.data.allowEurc) >= legAmount
   const showApprove = open && !t.cashSettled && !myLegFunded && !!bal.data && !approved
@@ -53,37 +56,55 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
   const pct = (v: bigint) => Math.min(100, Number((v * 10000n) / barMax) / 100)
   const tone = myMargin < maintenance ? 'bg-danger' : myMargin < initial ? 'bg-warn' : 'bg-success'
 
-  const approveLeg = () => run(`Allow ${legSymbol} for delivery`, approveCall(legToken, tenor, legAmount))
+  const cap = params.maxNotionalUsd6
+  const legWallet = bal.data ? (sellsUsd ? bal.data.walletUsdc : bal.data.walletEurc) : 0n
+  const legAllowance = bal.data ? (sellsUsd ? bal.data.allowUsdc : bal.data.allowEurc) : 0n
 
+  // Early, optional permission so that funding the leg later is a single step.
+  const approveLeg = () => {
+    const amount = reusableApproval({ needed: legAmount, walletBalance: legWallet, cap })
+    return runSteps([
+      {
+        id: 'approve',
+        kind: 'approve',
+        label: `Allow ${legSymbol} for delivery`,
+        reason: `Lets Tenor take up to ${fmtToken(amount)} ${legSymbol} from your wallet.`,
+        note: `${APPROVAL_NOTE} Tenor will be able to spend up to ${fmtToken(amount)} ${legSymbol}. You can revoke it any time in My trades.`,
+        call: approveCall(legToken, tenor, amount),
+      },
+    ])
+  }
+
+  const fundPlan = planFundLeg({ tenor, token: legToken, symbol: legSymbol, tradeId: row.id, amount: legAmount, allowance: legAllowance, walletBalance: legWallet, cap })
   const fundLeg = async () => {
-    if (!bal.data) return
-    if (!approved && !(await approveLeg())) return
-    await run('Fund leg', tenorCalls(tenor).fundLeg(row.id))
+    if (!bal.data || fundPlan.steps.length === 0) return
+    await runSteps(fundPlan.steps)
   }
+  const otherLegReady = settleIsNext({ usdLegFunded: t.usdLegFunded, eurLegFunded: t.eurLegFunded, iFundUsd: sellsUsd })
+  const bothFunded = t.usdLegFunded && t.eurLegFunded
 
+  const topUpValue = parseToken(topUpAmt) ?? 0n
+  const topUpPlan = planTopUp({
+    tenor,
+    usdc: net.usdc,
+    tradeId: row.id,
+    amount: topUpValue,
+    freeMargin: bal.data?.freeUsdc ?? 0n,
+    allowance: bal.data?.allowUsdc ?? 0n,
+    walletBalance: bal.data?.walletUsdc ?? 0n,
+    cap,
+  })
   const topUp = async () => {
-    const amt = parseToken(topUpAmt)
-    if (!amt || !bal.data) return
-    if (bal.data.freeUsdc < amt) {
-      const need = amt - bal.data.freeUsdc
-      if (bal.data.allowUsdc < need) {
-        const ok = await run('Allow USDC', approveCall(net.usdc, tenor, need))
-        if (!ok) return
-      }
-      const ok = await run('Deposit margin', tenorCalls(tenor).depositMargin(need))
-      if (!ok) return
-    }
-    await run('Top up', tenorCalls(tenor).topUp(row.id, amt))
+    if (!bal.data || topUpPlan.steps.length === 0) return
+    await runSteps(topUpPlan.steps)
   }
 
-  const withdraw = async () => {
-    if (!bal.data) return
-    if (bal.data.freeUsdc > 0n && !(await run('Withdraw USDC', tenorCalls(tenor).withdraw()))) return
-    if (bal.data.creditEurc > 0n) await run('Withdraw EURC', tenorCalls(tenor).withdrawEurc())
-  }
+  const withdrawPlan = planWithdrawAll({ tenor, freeUsdc: bal.data?.freeUsdc ?? 0n, eurcCredit: bal.data?.creditEurc ?? 0n })
+  const withdraw = () => runSteps(withdrawPlan.steps)
 
   const mine = logs.filter((l) => (l.args as { tradeId?: bigint }).tradeId === row.id)
-  const canWithdraw = !open && bal.data && (bal.data.freeUsdc > 0n || bal.data.creditEurc > 0n)
+  const canWithdraw = !open && !!bal.data && withdrawPlan.steps.length > 0
+  const previewSteps = canFund ? fundPlan.steps : canWithdraw ? withdrawPlan.steps : topUpPlan.steps
 
   return (
     <Card className="space-y-5">
@@ -169,13 +190,13 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
         ) : null}
         {open && !t.cashSettled && !myLegFunded && approved && !matured ? <Badge tone="good">{legSymbol} approved for delivery</Badge> : null}
         {canFund ? (
-          <Button variant="primary" onClick={fundLeg} loading={busy}>
-            Fund {legSymbol} leg ({fmtToken(legAmount)}){approved ? '' : ' · approve first'}
+          <Button variant="primary" onClick={fundLeg} loading={busy} disabled={!!fundPlan.blocker}>
+            Fund my leg ({fmtToken(legAmount)} {legSymbol})
           </Button>
         ) : null}
-        {open && matured ? (
-          <Button variant={t.cashSettled ? 'primary' : 'secondary'} onClick={() => run('Settle', tenorCalls(tenor).settle(row.id))} disabled={busy}>
-            Settle
+        {canSettle ? (
+          <Button variant={t.cashSettled || bothFunded ? 'primary' : 'secondary'} onClick={() => run('Settle', tenorCalls(tenor).settle(row.id))} disabled={busy}>
+            {bothFunded && !t.cashSettled ? 'Settle now' : 'Settle'}
           </Button>
         ) : null}
         {canClose ? (
@@ -185,7 +206,7 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
         ) : null}
         {canWithdraw ? (
           <Button variant="primary" onClick={withdraw} loading={busy}>
-            Withdraw
+            Withdraw everything
           </Button>
         ) : null}
         {open ? (
@@ -198,12 +219,16 @@ export function TradeCard({ row, me, params, logs }: { row: TradeRow; me: Addres
               value={topUpAmt}
               onChange={(e) => setTopUpAmt(e.target.value)}
             />
-            <Button onClick={topUp} disabled={busy || !parseToken(topUpAmt)}>
+            <Button onClick={topUp} disabled={busy || topUpPlan.steps.length === 0}>
               Top up
             </Button>
           </div>
         ) : null}
       </div>
+      {canFund && fundPlan.blocker ? <p className="text-sm text-danger">{fundPlan.blocker.message}</p> : null}
+      {canFund && !fundPlan.blocker && otherLegReady ? <p className="text-sm text-ink-2">The other leg is already funded, so Settle comes next.</p> : null}
+      {open && topUpValue > 0n && topUpPlan.blocker ? <p className="text-sm text-danger">{topUpPlan.blocker.message}</p> : null}
+      <StepTracker steps={previewSteps} state={state} atomic={atomic} />
       <TxStatus state={state} />
 
       {mine.length > 0 ? (

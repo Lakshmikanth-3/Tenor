@@ -1,15 +1,17 @@
 import type { Address } from 'viem'
-import { ConnectKitButton } from 'connectkit'
+import { WalletButton } from './WalletButton'
 import { useNet, useWallet } from '@/hooks/network'
 import { useBalances, useParams, useTrades } from '@/hooks/data'
 import { useActivity } from '@/hooks/activity'
 import { useTx } from '@/hooks/useTx'
-import { tenorCalls } from '@/lib/calls'
 import { fmtDateTime, fmtToken } from '@/lib/math'
 import { useTxHistory } from '@/lib/txstore'
 import { Link } from '@/lib/router'
 import { Badge, Button, Card, Empty, SectionTitle, Stat, TxLink, TxStatus } from './ui'
 import { MarginDeposit } from './MarginDeposit'
+import { Permissions } from './Permissions'
+import { StepTracker } from './StepTracker'
+import { planWithdrawAll } from '@/lib/steps'
 import { YieldPanel } from './YieldPanel'
 import { TradeCard } from './TradeCard'
 
@@ -27,7 +29,7 @@ export function Trades() {
         <Card className="text-center">
           <p className="mb-4 text-ink-2">Connect a wallet to see the trades you hold as hedger or dealer.</p>
           <div className="flex justify-center">
-            <ConnectKitButton />
+            <WalletButton />
           </div>
         </Card>
       </Page>
@@ -80,8 +82,9 @@ export function Trades() {
 function Account({ address }: { address: Address }) {
   const { net } = useNet()
   const bal = useBalances(address)
-  const { state, run, busy } = useTx()
+  const { state, runSteps, busy, atomic } = useTx()
   const tenor = net.tenor
+  const withdrawPlan = planWithdrawAll({ tenor: tenor as Address, freeUsdc: bal.data?.freeUsdc ?? 0n, eurcCredit: bal.data?.creditEurc ?? 0n })
   return (
     <Card>
       <SectionTitle>Balances in Tenor</SectionTitle>
@@ -89,21 +92,18 @@ function Account({ address }: { address: Address }) {
         <Stat label="Free USDC" value={bal.data ? fmtToken(bal.data.freeUsdc) : '–'} sub="margin, payouts and vault" />
         <Stat label="EURC credit" value={bal.data ? fmtToken(bal.data.creditEurc) : '–'} sub="delivered, withdrawable" />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          disabled={!tenor || busy || !bal.data || bal.data.freeUsdc === 0n}
-          onClick={() => tenor && run('Withdraw USDC', tenorCalls(tenor).withdraw())}
-        >
-          Withdraw USDC
-        </Button>
-        <Button
-          disabled={!tenor || busy || !bal.data || bal.data.creditEurc === 0n}
-          onClick={() => tenor && run('Withdraw EURC', tenorCalls(tenor).withdrawEurc())}
-        >
-          Withdraw EURC
-        </Button>
-      </div>
+      {withdrawPlan.steps.length > 0 ? (
+        <div className="mt-4">
+          <Button variant="primary" disabled={!tenor || busy} loading={busy} onClick={() => void runSteps(withdrawPlan.steps)}>
+            Withdraw everything
+          </Button>
+          <StepTracker steps={withdrawPlan.steps} state={state} atomic={atomic} />
+        </div>
+      ) : null}
       <TxStatus state={state} />
+      <div className="mt-5 border-t border-line pt-4">
+        <Permissions />
+      </div>
       <div className="mt-5 border-t border-line pt-4">
         <YieldPanel />
       </div>

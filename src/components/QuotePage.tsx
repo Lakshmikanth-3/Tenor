@@ -5,14 +5,15 @@ import { Check, X } from 'lucide-react'
 import { useNet, useWallet } from '@/hooks/network'
 import { useBalances, useIsDealer, useNonceUsed, useParams, useQuoteView } from '@/hooks/data'
 import { useTx } from '@/hooks/useTx'
-import { tenorCalls } from '@/lib/calls'
 import { tenorAbi } from '@/lib/tenorAbi'
 import { ceilBps, eurcFor, fmtDate, fmtDateTime, fmtDuration, fmtRate, fmtToken, nowSec } from '@/lib/math'
 import { decodeQuote, quoteTypedData } from '@/lib/quote'
 import { Link, useLocation } from '@/lib/router'
 import { NETWORKS } from '@/lib/networks'
 import { AddressLink, Badge, Button, Card, Notice, SectionTitle, TxStatus } from './ui'
-import { MarginDeposit } from './MarginDeposit'
+import { FundFromAnyChain } from './FundFromAnyChain'
+import { StepTracker } from './StepTracker'
+import { planLockRate } from '@/lib/steps'
 
 function Check1({ ok, children }: { ok: boolean | undefined; children: React.ReactNode }) {
   return (
@@ -110,7 +111,21 @@ export function QuotePage() {
   const expired = expiresIn < 0
   const inBand = liveQ ? quote.rate >= liveQ.bandLow && quote.rate <= liveQ.bandHigh : undefined
   const tenorOk = params.data ? BigInt(Math.max(tenorLeft, 0)) >= params.data.minTenor : undefined
-  const marginOk = bal.data ? bal.data.freeUsdc >= im : undefined
+  const plan =
+    bal.data && params.data && net.tenor
+      ? planLockRate({
+          tenor: link.tenor,
+          usdc: net.usdc,
+          quote,
+          signature: link.signature,
+          margin: im,
+          freeMargin: bal.data.freeUsdc,
+          allowance: bal.data.allowUsdc,
+          walletBalance: bal.data.walletUsdc,
+          cap: params.data.maxNotionalUsd6,
+        })
+      : undefined
+  const marginOk = plan ? !plan.blocker : undefined
   const dealerFunded = dealerFree.data !== undefined ? dealerFree.data >= im : undefined
   const isDealerWallet = !!address && address.toLowerCase() === quote.dealer.toLowerCase()
   const ready = sigOk.data && allowed.data && !used.data && !expired && inBand && tenorOk && marginOk && dealerFunded && !isDealerWallet
@@ -155,28 +170,41 @@ export function QuotePage() {
             </Check1>
             <Check1 ok={tenorOk}>Maturity is far enough away</Check1>
             <Check1 ok={dealerFunded}>Dealer has funded the margin</Check1>
+            <Check1 ok={marginOk}>You have enough USDC for the margin</Check1>
           </ul>
         </Card>
 
         <div className="space-y-6">
           <Card>
-            <SectionTitle>1. Add margin</SectionTitle>
-            <p className="mb-3 text-sm text-muted">You post {fmtToken(im)} USDC, the dealer posts the same. It is returned at maturity apart from any variation.</p>
-            <MarginDeposit needed={im} />
-          </Card>
-          <Card>
-            <SectionTitle>2. Lock rate</SectionTitle>
+            <SectionTitle>Lock rate</SectionTitle>
+            <p className="mb-3 text-sm text-muted">
+              You post {fmtToken(im)} USDC, the dealer posts the same. It is returned at maturity apart from any variation.
+              {bal.data
+                ? bal.data.freeUsdc >= im
+                  ? ' You already have enough margin in Tenor, so this is one step.'
+                  : ` Your margin in Tenor is ${fmtToken(bal.data.freeUsdc)} USDC, so ${fmtToken(im - bal.data.freeUsdc)} USDC will be added first.`
+                : ''}
+            </p>
             {isDealerWallet ? <p className="mb-3 text-sm text-warn">You are connected as the dealer. Open this link with the hedger wallet.</p> : null}
+            {plan?.blocker ? (
+              <div className="mb-3 space-y-3">
+                <p className="text-sm text-danger" role="alert">
+                  {plan.blocker.message}
+                </p>
+                <FundFromAnyChain className="!p-4" />
+              </div>
+            ) : null}
             <Button
               variant="primary"
               className="w-full"
               loading={open.busy}
-              disabled={!address || !ready}
-              onClick={() => open.run('Lock rate', tenorCalls(link.tenor).open(quote, link.signature))}
+              disabled={!address || !ready || !plan || plan.steps.length === 0}
+              onClick={() => plan && open.runSteps(plan.steps)}
             >
               Lock rate
             </Button>
             {!address ? <p className="mt-2 text-xs text-muted">Connect your wallet to continue.</p> : null}
+            <StepTracker steps={plan?.steps ?? []} state={open.state} atomic={open.atomic} />
             <TxStatus state={open.state} />
             {open.state.phase === 'done' ? (
               <p className="mt-3 text-sm">

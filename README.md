@@ -67,6 +67,8 @@ Built end to end with [Arc Studio](https://studio.arc.io) for Arc Microgrants.
 - **Refusal room**: eight attacks run live against the deployed contract and refused by name: `StalePrice`, `OffMarketRate`, `NonceUsed` (replayed quote), `BadSignature` (forged quote), `QuoteExpired`, `MarginLocked`, `AlreadySettled`, `NotMatured`, plus one valid control that passes.
 - USYC adapter: 17/17 local end-to-end checks against the real Tenor v2 code.
 - **Proof page** in the app: the contracts with explorer links, every Tenor event since deployment (filterable, newest first), live totals (trades, notional, delivered amounts, margin held in USYC), all read from the chain in your browser. It also works on mainnet and shows a notice until Tenor is deployed there.
+- **Fewer wallet popups**: one button per goal (Lock rate, Fund my leg, Withdraw everything) with a step tracker. Permissions are asked only when the allowance is too low, and for a reusable amount (five times the per-trade cap, or your wallet balance if lower); My trades shows who can spend how much and a Revoke link. Wallets that support atomic batching (EIP-5792) confirm the steps once; others go step by step. Every call is simulated first, so one that would fail never opens the wallet.
+- **Wallet choice**: wallets are picked by EIP-6963 with MetaMask recommended, so another installed wallet cannot intercept requests.
 - **Fund from any chain**: every margin deposit panel and the fund-leg step link to Circle's CCTP and Gateway docs (and the testnet faucet) and show your USDC and EURC balances on Arc. Links only, no extra contract calls.
 
 ---
@@ -133,6 +135,7 @@ bun install
 bun run dev              # app
 bun run check            # lint + typecheck
 bun run contracts:test   # Foundry tests
+bun run test             # unit tests for the wallet step planning
 ```
 
 ### Environment variables

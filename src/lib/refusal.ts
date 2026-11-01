@@ -33,7 +33,7 @@ const addrWord = (a: Address): Hex => pad(a, { size: 32 })
 const mapSlot = (key: Hex, slot: bigint): Hex => keccak256(encodeAbiParameters([{ type: 'bytes32' }, { type: 'uint256' }], [key, slot]))
 
 const dealerSlot = (a: Address): Slot => ({ slot: mapSlot(addrWord(a), SLOT.dealers), value: word(1n) })
-const balanceSlot = (a: Address, amount: bigint): Slot => ({ slot: mapSlot(addrWord(a), SLOT.usdcBalance), value: word(amount) })
+export const balanceSlot = (a: Address, amount: bigint): Slot => ({ slot: mapSlot(addrWord(a), SLOT.usdcBalance), value: word(amount) })
 const nonceSlot = (dealer: Address, nonce: bigint): Slot => {
   const outer = mapSlot(addrWord(dealer), SLOT.nonceUsed)
   return { slot: keccak256(encodeAbiParameters([{ type: 'uint256' }, { type: 'bytes32' }], [nonce, outer])), value: word(1n) }
