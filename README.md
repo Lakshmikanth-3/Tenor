@@ -21,7 +21,8 @@ Built end to end with [Arc Studio](https://studio.arc.io) for Arc Microgrants.
 
 | | |
 | --- | --- |
-| Tenor | _added after mainnet deploy_ |
+| Tenor v2 | [`0x17e1835B6af8FaDB2D581a4b3CEE86c8796D4212`](https://explorer.arc.io/address/0x17e1835B6af8FaDB2D581a4b3CEE86c8796D4212) (deploy block 29052574, [deploy tx](https://explorer.arc.io/tx/0x49a52777bb5d8be980b82aa307c8bd8d320fbb8ce2f86af74eb4958b02b66d0b)) |
+| Owner and allowlisted dealer | `0x825E71195C33d7979052639f53Ad5d3f8fDcde5B` (yield vault off) |
 | First USDC trade | _added after mainnet deploy_ |
 | EUR/USD price | Chainlink feed [`0xDd5B15443cd733D3966a50a3E48cB7DF9Fb5DE0D`](https://explorer.arc.io/address/0xDd5B15443cd733D3966a50a3E48cB7DF9Fb5DE0D) |
 | EURC | [`0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1`](https://explorer.arc.io/address/0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1) |
@@ -145,12 +146,14 @@ All values are public addresses and block numbers.
 
 | Name | Purpose |
 | --- | --- |
-| `VITE_NETWORK_DEFAULT` | `testnet` or `mainnet` on first load |
+| `VITE_NETWORK_DEFAULT` | `testnet` or `mainnet` on first load (a network chosen in the header is remembered and wins) |
 | `VITE_TENOR_ADDRESS_TESTNET` | Tenor on Arc Testnet (v2: `0xfa9d…3ee`) |
 | `VITE_DEPLOY_BLOCK_TESTNET` | Where event scanning starts (v2: 69655019) |
 | `VITE_FEED_TESTNET` / `VITE_EURC_TESTNET` | Mock feed and EURC on testnet |
-| `VITE_TENOR_ADDRESS_MAINNET` / `VITE_DEPLOY_BLOCK_MAINNET` | Tenor on Arc Mainnet (the app shows a notice while empty) |
+| `VITE_TENOR_ADDRESS_MAINNET` / `VITE_DEPLOY_BLOCK_MAINNET` | Tenor v2 on Arc Mainnet (`0x17e1…4212`, block 29052574). The app shows a notice while empty |
 | `VITE_FEED_MAINNET` / `VITE_EURC_MAINNET` | Chainlink EUR/USD and EURC on mainnet |
+
+The public values above are committed in `.env.production`, which the production build reads; values set in your host's project settings override it.
 
 ### USYC addresses
 

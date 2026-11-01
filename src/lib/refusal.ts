@@ -11,6 +11,7 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { tenorAbi } from './tenorAbi'
 import { decodeRevert } from './errors'
+import { isRateLimit } from './logScanner'
 import { ceilBps, nowSec } from './math'
 import { quoteTuple, quoteTypedData, type QuoteMsg } from './quote'
 
@@ -27,6 +28,18 @@ const TRADE = { party: 1n, notional: 2n, maturity: 5n, callParty: 15n, hedger: 0
 const FAKE_TRADE_ID = 1_000_000_000n
 
 type Slot = { slot: Hex; value: Hex }
+
+/** Public RPCs (Arc mainnet in particular) throttle bursts. Retry only on a rate-limit answer, with growing waits. */
+async function retryLimited<T>(fn: () => Promise<T>, tries = 5): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn()
+    } catch (e) {
+      if (!isRateLimit(e) || attempt >= tries - 1) throw e
+      await new Promise((r) => setTimeout(r, 700 * 2 ** attempt))
+    }
+  }
+}
 
 const word = (n: bigint): Hex => pad(toHex(n), { size: 32 })
 const addrWord = (a: Address): Hex => pad(a, { size: 32 })
@@ -88,13 +101,13 @@ async function simulate(
   time?: bigint,
 ): Promise<{ ok: true; data?: Hex } | { ok: false; errorName?: string; message: string }> {
   try {
-    const r = await ctx.client.call({
+    const r = await retryLimited(() => ctx.client.call({
       account: from,
       to: ctx.tenor,
       data,
       ...(slots.length ? { stateOverride: [{ address: ctx.tenor, stateDiff: slots }] } : {}),
       ...(time ? { blockOverrides: { time } } : {}),
-    })
+    }))
     return { ok: true, data: r.data }
   } catch (e) {
     const d = decodeRevert(e)
@@ -111,7 +124,7 @@ const forgerAcct = privateKeyToAccount(generatePrivateKey())
 const hedgerAddr = privateKeyToAccount(generatePrivateKey()).address
 
 async function fairRate(ctx: ScenarioCtx, notional: bigint, tenor: bigint): Promise<bigint> {
-  const q = await ctx.client.readContract({ address: ctx.tenor, abi: tenorAbi, functionName: 'quote', args: [notional, tenor] })
+  const q = await retryLimited(() => ctx.client.readContract({ address: ctx.tenor, abi: tenorAbi, functionName: 'quote', args: [notional, tenor] }))
   return q[1]
 }
 
@@ -121,7 +134,7 @@ async function signedOpen(
   signer = dealerAcct,
   slots: (q: QuoteMsg) => Slot[] = () => [],
 ): Promise<Outcome> {
-  const chainId = await ctx.client.getChainId()
+  const chainId = await retryLimited(() => ctx.client.getChainId())
   const notional = 10_000_000n
   const tenorSecs = 86_400n
   let fair: bigint
@@ -174,15 +187,13 @@ export const SCENARIOS: Scenario[] = [
     setup: 'The simulated block is moved past the feed\'s last update plus the staleness limit.',
     expected: 'StalePrice',
     run: async (ctx) => {
-      const [feed, maxStaleness] = await Promise.all([
-        ctx.client.readContract({ address: ctx.tenor, abi: tenorAbi, functionName: 'feed' }),
-        ctx.client.readContract({ address: ctx.tenor, abi: tenorAbi, functionName: 'maxStaleness' }),
-      ])
-      const round = await ctx.client.readContract({
+      const feed = await retryLimited(() => ctx.client.readContract({ address: ctx.tenor, abi: tenorAbi, functionName: 'feed' }))
+      const maxStaleness = await retryLimited(() => ctx.client.readContract({ address: ctx.tenor, abi: tenorAbi, functionName: 'maxStaleness' }))
+      const round = await retryLimited(() => ctx.client.readContract({
         address: feed,
         abi: [{ type: 'function', name: 'latestRoundData', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint80' }, { type: 'int256' }, { type: 'uint256' }, { type: 'uint256' }, { type: 'uint80' }] }] as const,
         functionName: 'latestRoundData',
-      })
+      }))
       const target = round[3] + maxStaleness + 60n
       const time = target > BigInt(nowSec()) + 60n ? target : BigInt(nowSec()) + 60n
       const data = encodeFunctionData({ abi: tenorAbi, functionName: 'quote', args: [10_000_000n, 86_400n] })
