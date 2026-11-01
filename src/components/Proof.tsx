@@ -7,6 +7,7 @@ import { PROOF_EVENTS, useBlockTimes, useProofChain, useProofData, type ProofEve
 import { fmtDateTime, fmtToken } from '@/lib/math'
 import { SCENARIOS } from '@/lib/refusal'
 import { AddressLink, Badge, Card, Empty, Notice, SectionTitle, Stat, TxLink } from './ui'
+import { ScanProgress, Skeleton } from './ScanProgress'
 import { vaultLabel } from './YieldPanel'
 
 const STUDIO_URL = 'https://studio.arc.io/app/e5ec61eb-5f78-47d8-8423-d315eba31d29'
@@ -29,6 +30,12 @@ export function Proof() {
       return next
     })
 
+  // While the scan is still running a zero means "not found yet", never "none", so zeros show as Loading.
+  const partial = !activity.complete
+  const count = (v: number) => (partial && v === 0 ? <Skeleton /> : v)
+  const money = (v: bigint) => (partial && v === 0n ? <Skeleton className="w-20" /> : fmtToken(v))
+  const so = (sub: string) => (partial ? 'so far' : sub)
+
   const kind = yieldInfo.data && 'kind' in yieldInfo.data ? yieldInfo.data.kind : undefined
 
   return (
@@ -43,6 +50,12 @@ export function Proof() {
           <Notice tone="info" title={`Tenor is not deployed on ${net.label} yet`}>
             No Tenor address is configured for this network, so there is no activity to show. The token contracts below are real; switch to Testnet to see live history.
           </Notice>
+        </div>
+      ) : null}
+
+      {net.tenor ? (
+        <div className="mb-6">
+          <ScanProgress activity={activity} />
         </div>
       ) : null}
 
@@ -77,29 +90,21 @@ export function Proof() {
         {net.tenor ? (
           <>
             <Card>
-              <SectionTitle hint={activity.data ? `blocks ${activity.data.from.toString()} to ${activity.data.head.toString()}` : undefined}>Totals</SectionTitle>
-              {activity.isLoading ? (
-                <p className="text-sm text-muted">Scanning {net.label} for Tenor events…</p>
-              ) : activity.isError ? (
-                <Notice tone="warn" title="Could not read the event history">
-                  The RPC refused the request. It will retry automatically.
-                </Notice>
-              ) : (
-                <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
-                  <Stat label="Trades opened" value={totals.opened} />
-                  <Stat label="Delivered" value={totals.delivered} sub="physical" />
-                  <Stat label="Cash-settled" value={totals.cashSettled} />
-                  <Stat label="Delivery failed" value={totals.deliveryFailed} />
-                  <Stat label="USDC notional" value={fmtToken(totals.notionalUsd6)} sub="total opened" />
-                  <Stat label="USDC delivered" value={fmtToken(totals.usdcDelivered)} sub="physical legs" />
-                  <Stat label="EURC delivered" value={fmtToken(totals.eurcDelivered)} sub="physical legs" />
-                  <Stat
-                    label="Margin held in USYC"
-                    value={chain.data ? (chain.data.vault ? (chain.data.inVault !== undefined ? fmtToken(chain.data.inVault) : '–') : 'Off') : '–'}
-                    sub={chain.data?.vault ? `USDC value of ${fmtToken(chain.data.shares)} shares` : 'no yield vault set'}
-                  />
-                </div>
-              )}
+              <SectionTitle hint={activity.head > 0n ? `blocks ${activity.from.toString()} to ${activity.head.toString()}` : undefined}>Totals</SectionTitle>
+              <div className="grid grid-cols-2 gap-5 md:grid-cols-4">
+                <Stat label="Trades opened" value={count(totals.opened)} sub={partial ? 'so far' : undefined} />
+                <Stat label="Delivered" value={count(totals.delivered)} sub={so('physical')} />
+                <Stat label="Cash-settled" value={count(totals.cashSettled)} sub={partial ? 'so far' : undefined} />
+                <Stat label="Delivery failed" value={count(totals.deliveryFailed)} sub={partial ? 'so far' : undefined} />
+                <Stat label="USDC notional" value={money(totals.notionalUsd6)} sub={so('total opened')} />
+                <Stat label="USDC delivered" value={money(totals.usdcDelivered)} sub={so('physical legs')} />
+                <Stat label="EURC delivered" value={money(totals.eurcDelivered)} sub={so('physical legs')} />
+                <Stat
+                  label="Margin held in USYC"
+                  value={chain.data ? (chain.data.vault ? (chain.data.inVault !== undefined ? fmtToken(chain.data.inVault) : '–') : 'Off') : <Skeleton className="w-20" />}
+                  sub={chain.data?.vault ? `USDC value of ${fmtToken(chain.data.shares)} shares` : 'no yield vault set'}
+                />
+              </div>
             </Card>
 
             <Card>
@@ -125,12 +130,17 @@ export function Proof() {
                       filter.has(e) ? 'border-accent bg-accent text-white' : 'border-line bg-surface text-ink hover:bg-surface-muted',
                     )}
                   >
-                    {e} <span className="num opacity-70">{counts[e] ?? 0}</span>
+                    {e} <span className="num opacity-70">{partial && !counts[e] ? '…' : (counts[e] ?? 0)}</span>
                   </button>
                 ))}
               </div>
-              {activity.isLoading ? (
-                <p className="text-sm text-muted">Loading…</p>
+              {rows.length === 0 && partial ? (
+                <div className="space-y-2" role="status" aria-label="Loading events">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-8 animate-pulse rounded-lg bg-surface-muted" />
+                  ))}
+                  <p className="text-sm text-muted">Newest blocks are read first, so recent events appear as soon as they are found.</p>
+                </div>
               ) : rows.length === 0 ? (
                 <Empty title="No matching events">Nothing has been emitted for this filter since block {net.deployBlock?.toString() ?? 'the scan start'}.</Empty>
               ) : (

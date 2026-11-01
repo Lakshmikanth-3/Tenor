@@ -10,6 +10,10 @@ declare module 'bun:test' {
     toBeUndefined(): void
     toBeGreaterThanOrEqual(n: number): void
     toBeLessThan(n: number): void
+    toBeGreaterThan(n: number): void
+    toBeTruthy(): void
+    toBeFalsy(): void
+    toHaveLength(n: number): void
   }
   export const expect: (actual: unknown) => Matchers
 }

@@ -1,71 +1,116 @@
-import { useQuery } from '@tanstack/react-query'
-import { parseEventLogs, type Address, type GetContractEventsReturnType, type PublicClient } from 'viem'
-import { tenorAbi } from '@/lib/tenorAbi'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { createPublicClient, http, type Address, type PublicClient } from 'viem'
+import { LogScanner, browserStorage, type ScanSnapshot, type TenorLog } from '@/lib/logScanner'
+import type { NetworkCfg } from '@/lib/networks'
 import { useNet } from './network'
 
-export type TenorLog = GetContractEventsReturnType<typeof tenorAbi>[number]
+export type { TenorLog } from '@/lib/logScanner'
 
-/** Every getLogs request spans fewer than 10,000 blocks. */
-const WINDOW = 9_000n
-const CONCURRENCY = 2
-const RETRIES = 6
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const POLL_MS = 10_000
+// The public Arc RPC allows roughly two requests a second; staying under that avoids 429s altogether.
+const MIN_INTERVAL_MS = 550
+// Without a configured deploy block, only recent history is scanned.
+const FALLBACK_LOOKBACK = 9_900n
 
-/** The public RPC rate-limits bursts of getLogs; back off and retry rather than failing the whole scan. */
-async function withBackoff<T>(fn: () => Promise<T>): Promise<T> {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await fn()
-    } catch (e) {
-      if (attempt >= RETRIES) throw e
-      await sleep(500 * 2 ** attempt)
-    }
+interface Entry {
+  scanner: LogScanner
+  users: number
+  timer?: ReturnType<typeof setInterval>
+}
+const entries = new Map<string, Entry>()
+
+/** A client for scanning only: the transport does not retry on its own, so every retry is ours and honours the rate limit. */
+const scanClients = new Map<string, PublicClient>()
+function scanClient(net: NetworkCfg): PublicClient {
+  let c = scanClients.get(net.key)
+  if (!c) {
+    c = createPublicClient({ chain: net.chain, transport: http(net.rpcUrl, { retryCount: 0 }) })
+    scanClients.set(net.key, c)
   }
+  return c
 }
 
-interface Cache {
-  next: bigint
-  logs: TenorLog[]
+function acquire(entry: Entry): void {
+  entry.users += 1
+  if (entry.users > 1) return
+  void entry.scanner.scan()
+  // After the first pass only new blocks (and any window that failed earlier) are read.
+  entry.timer = setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return
+    void entry.scanner.scan()
+  }, POLL_MS)
 }
-const caches = new Map<string, Cache>()
 
-export async function scanLogs(client: PublicClient, tenor: Address, from: bigint, to: bigint): Promise<TenorLog[]> {
-  const windows: [bigint, bigint][] = []
-  for (let start = from; start <= to; start += WINDOW) {
-    const end = start + WINDOW - 1n > to ? to : start + WINDOW - 1n
-    windows.push([start, end])
-  }
-  const out: TenorLog[] = []
-  for (let i = 0; i < windows.length; i += CONCURRENCY) {
-    const batch = await Promise.all(
-      windows.slice(i, i + CONCURRENCY).map(async ([fromBlock, toBlock]) => {
+function release(entry: Entry): void {
+  entry.users -= 1
+  if (entry.users > 0) return
+  if (entry.timer) clearInterval(entry.timer)
+  entry.timer = undefined
+}
+
+/** One scanner per network + contract, shared by every component on every page. */
+function scannerFor(net: NetworkCfg, tenor: Address, fallbackClient: PublicClient): Entry {
+  const key = `${net.chainId}:${tenor.toLowerCase()}`
+  const hit = entries.get(key)
+  if (hit) return hit
+  const client = net.deployBlock !== undefined ? scanClient(net) : fallbackClient
+  const entry: Entry = {
+    users: 0,
+    scanner: new LogScanner({
+      storageKey: `tenor.scan.v1:${key}`,
+      from: net.deployBlock,
+      lookback: FALLBACK_LOOKBACK,
+      minIntervalMs: MIN_INTERVAL_MS,
+      storage: browserStorage(),
+      getHead: () => client.getBlockNumber(),
+      getLogs: async (fromBlock, toBlock) => {
         // Filter by address only. A topic0 list of every event is rejected by the Arc RPC as "range too large".
-        const raw = await withBackoff(() => client.getLogs({ address: tenor, fromBlock, toBlock }))
-        return parseEventLogs({ abi: tenorAbi, logs: raw })
-      }),
-    )
-    for (const b of batch) out.push(...b)
+        const logs = await client.getLogs({ address: tenor, fromBlock, toBlock })
+        return logs
+      },
+    }),
   }
-  return out
+  entries.set(key, entry)
+  return entry
 }
 
-/** Tenor events from the deployment block to head, scanned incrementally in windows under 10,000 blocks. */
-export function useActivity() {
+export interface Activity extends ScanSnapshot {
+  /** True until the first window has been read (or the cache was loaded). */
+  loading: boolean
+}
+
+const EMPTY: Activity = { logs: [], from: 0n, head: 0n, progress: 0, running: false, complete: false, rateLimited: false, requests: 0, loading: false }
+const noopSubscribe = () => () => undefined
+const emptySnapshot = () => EMPTY
+
+/**
+ * Tenor events from the deployment block to head. Every caller shares one scan: it streams newest windows first, resumes from a
+ * local cache on repeat visits, and afterwards only polls for new blocks.
+ */
+export function useActivity(): Activity {
   const { net, client } = useNet()
-  return useQuery({
-    queryKey: ['activity', net.key, net.tenor],
-    enabled: !!net.tenor,
-    refetchInterval: 10_000,
-    queryFn: async () => {
-      const tenor = net.tenor as Address
-      const key = `${net.chainId}:${tenor}`
-      const head = await client.getBlockNumber()
-      const cached = caches.get(key)
-      const start = cached?.next ?? net.deployBlock ?? (head > WINDOW ? head - WINDOW : 0n)
-      const fresh = start <= head ? await scanLogs(client, tenor, start, head) : []
-      const next: Cache = { next: head + 1n, logs: [...(cached?.logs ?? []), ...fresh] }
-      caches.set(key, next)
-      return { logs: next.logs, head, from: net.deployBlock ?? start }
-    },
+  const entry = useMemo(() => (net.tenor ? scannerFor(net, net.tenor, client) : undefined), [net, client])
+  const snap = useSyncExternalStore(entry ? entry.scanner.subscribe : noopSubscribe, entry ? entry.scanner.getSnapshot : emptySnapshot)
+
+  useEffect(() => {
+    if (!entry) return
+    acquire(entry)
+    return () => release(entry)
+  }, [entry])
+
+  if (!entry) return EMPTY
+  return { ...snap, loading: !snap.complete && snap.logs.length === 0 && snap.progress < 100 }
+}
+
+/** One-off scan of [from, to] with no cache (scripts and tests). */
+export async function scanLogs(client: PublicClient, tenor: Address, from: bigint, to: bigint): Promise<TenorLog[]> {
+  const scanner = new LogScanner({
+    storageKey: 'unused',
+    from,
+    storage: null,
+    getHead: () => Promise.resolve(to),
+    getLogs: async (fromBlock, toBlock) => await client.getLogs({ address: tenor, fromBlock, toBlock }),
   })
+  await scanner.scan()
+  return scanner.getSnapshot().logs
 }

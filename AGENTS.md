@@ -46,7 +46,7 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 ## Web app
 
-- `/proof` (Proof page, `src/components/Proof.tsx`, data in `src/hooks/proof.ts`) reads Tenor events from the deploy block via `useActivity` (getLogs windows under 10,000 blocks, 2 at a time with backoff because the public RPC rate-limits). `FundFromAnyChain` is links only.
+- `/proof` (Proof page, `src/components/Proof.tsx`, data in `src/hooks/proof.ts`) and My trades read Tenor events from one shared scanner (`src/lib/logScanner.ts`, used through `useActivity`): getLogs windows of 9,900 blocks, newest first, streamed into the UI, paced at about 2 requests a second (the public Arc RPC returns 429 above that), cached in localStorage per network + contract so a repeat visit reads only new blocks, then polled for new blocks only. Zero totals are shown as Loading until the scan completes. `FundFromAnyChain` is links only.
 - Wallet flow: `src/lib/steps.ts` plans steps (pure, tested by `bun run test`); `src/hooks/useTx.ts` runs them (simulate first, EIP-5792 atomic batch when `useAtomic` says so, else sequential, account guard, toast + query refresh). `WalletButton` picks wallets by EIP-6963. Approvals are reusable (5x per-trade cap or wallet balance).
 - Pages (path routing, `src/App.tsx`): `/` Hedge, `/trades`, `/dealer`, `/quote?q=...` (signed dealer quote link), `/refusal`, `/admin` (testnet only).
 - Network is switchable (testnet or mainnet) in the header; addresses come from `VITE_*` env vars (see README). Tenor is not deployed on mainnet yet.

@@ -10,6 +10,7 @@ import { Link } from '@/lib/router'
 import { Badge, Button, Card, Empty, SectionTitle, Stat, TxLink, TxStatus } from './ui'
 import { MarginDeposit } from './MarginDeposit'
 import { Permissions } from './Permissions'
+import { ScanProgress } from './ScanProgress'
 import { StepTracker } from './StepTracker'
 import { planWithdrawAll } from '@/lib/steps'
 import { YieldPanel } from './YieldPanel'
@@ -40,6 +41,7 @@ export function Trades() {
     <Page>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
         <div className="space-y-6">
+          <ScanProgress activity={activity} />
           {trades.isLoading ? <Card>Loading trades from {net.label}…</Card> : null}
           {trades.data && trades.data.length === 0 ? (
             <Empty title="No trades yet">
@@ -48,14 +50,14 @@ export function Trades() {
           ) : null}
           {params.data && trades.data
             ? trades.data.map((row) => (
-                <TradeCard key={row.id.toString()} row={row} me={address} params={params.data} logs={activity.data?.logs ?? []} />
+                <TradeCard key={row.id.toString()} row={row} me={address} params={params.data} logs={activity.logs} />
               ))
             : null}
         </div>
         <div className="space-y-6">
           <Account address={address} />
           <Card>
-            <SectionTitle hint={activity.data ? `events from block ${activity.data.from.toString()}` : undefined}>Your transactions</SectionTitle>
+            <SectionTitle hint={activity.head > 0n ? `events from block ${activity.from.toString()}` : undefined}>Your transactions</SectionTitle>
             {history.length === 0 ? (
               <p className="text-sm text-muted">Transactions you send from this app appear here with an explorer link.</p>
             ) : (

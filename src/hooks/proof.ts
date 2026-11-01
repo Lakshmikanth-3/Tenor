@@ -162,9 +162,9 @@ export function useProofChain() {
 /** Newest-first rows, the totals, and scan progress, all from one incremental log scan. */
 export function useProofData(filter: Set<ProofEvent>, usdc: string, eurc: string | undefined) {
   const activity = useActivity()
-  const logs = activity.data?.logs
+  const logs = activity.logs
   const all = useMemo(() => {
-    const rows = (logs ?? []).map(toRow).filter((r): r is ProofRow => !!r)
+    const rows = logs.map(toRow).filter((r): r is ProofRow => !!r)
     return rows.sort((a, b) => (a.block === b.block ? b.logIndex - a.logIndex : a.block < b.block ? 1 : -1))
   }, [logs])
   const counts = useMemo(() => {
@@ -173,6 +173,6 @@ export function useProofData(filter: Set<ProofEvent>, usdc: string, eurc: string
     return c
   }, [all])
   const rows = useMemo(() => all.filter((r) => filter.size === 0 || filter.has(r.event)).slice(0, 200), [all, filter])
-  const totals = useMemo(() => computeTotals(logs ?? [], usdc, eurc), [logs, usdc, eurc])
+  const totals = useMemo(() => computeTotals(logs, usdc, eurc), [logs, usdc, eurc])
   return { activity, rows, counts, totals, total: all.length }
 }
