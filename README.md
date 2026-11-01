@@ -23,9 +23,22 @@ Built end to end with [Arc Studio](https://studio.arc.io) for Arc Microgrants.
 | --- | --- |
 | Tenor v2 | [`0x17e1835B6af8FaDB2D581a4b3CEE86c8796D4212`](https://explorer.arc.io/address/0x17e1835B6af8FaDB2D581a4b3CEE86c8796D4212) (deploy block 29052574, [deploy tx](https://explorer.arc.io/tx/0x49a52777bb5d8be980b82aa307c8bd8d320fbb8ce2f86af74eb4958b02b66d0b)) |
 | Owner and allowlisted dealer | `0x825E71195C33d7979052639f53Ad5d3f8fDcde5B` (yield vault off) |
-| First USDC trade | _added after mainnet deploy_ |
 | EUR/USD price | Chainlink feed [`0xDd5B15443cd733D3966a50a3E48cB7DF9Fb5DE0D`](https://explorer.arc.io/address/0xDd5B15443cd733D3966a50a3E48cB7DF9Fb5DE0D) |
 | EURC | [`0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1`](https://explorer.arc.io/address/0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1) |
+
+
+**First mainnet trade, through the live app with MetaMask (2 Nov 2026):**
+
+| What happened | Tx |
+| --- | --- |
+| Dealer deposits 0.05 USDC margin | [0xe652cb5f…cea89](https://explorer.arc.io/tx/0xe652cb5f8c19c8b1171f5e2ccded6a8b50d1e8b6d589d6e5603c8def413cea89) |
+| Business deposits 0.05 USDC margin | [0xafe6a293…07341](https://explorer.arc.io/tx/0xafe6a293e32aceb54b90bac0213ad30e59d12542cfd906502f0e81b7f9307341) |
+| **Lock rate: 1 USDC cash-settled forward opened** | [0x547e61e2…b8911](https://explorer.arc.io/tx/0x547e61e21234dcac8c29b4aeb39391209192dfa3b3ec9f1210459bc32b4b8911) |
+| Mark against the Chainlink EUR/USD price | [0xc2d74313…b88a4](https://explorer.arc.io/tx/0xc2d74313399930e4b5ef5312f0562423cbe899724e4b8447fa27f9fb07db88a4) |
+| Settle at maturity | [0x7c6713be…8b989](https://explorer.arc.io/tx/0x7c6713bed9ec2b60e19e33a4626d72be9c3b2cf140585ca8ffb92209efc8b989) |
+| **Withdraw: 0.05 USDC from Tenor to the business wallet** | [0xf2e036b3…a398c](https://explorer.arc.io/tx/0xf2e036b36444f20e3b913754b9bde42c830677436ce0574b8b924263ab4a398c) |
+
+All eight Refusal room attacks were also run against the mainnet contract and refused.
 
 ### Arc Testnet (chain 5042002): contracts
 
@@ -77,14 +90,70 @@ Built end to end with [Arc Studio](https://studio.arc.io) for Arc Microgrants.
 
 ## How it works
 
+### Architecture
+
+```mermaid
+flowchart LR
+  B["Business (hedger)<br/>MetaMask"] -- "lock rate, margin, settle, withdraw" --> T
+  D["Dealer<br/>MetaMask"] -- "EIP-712 quote (off-chain link)" --> B
+  D -- "margin, withdraw" --> T
+  subgraph Arc["Arc (USDC gas, sub-second finality)"]
+    T["Tenor contract"]
+    F["Chainlink EUR/USD"]
+    U["USDC"]
+    E["EURC"]
+    Y["USYC adapter<br/>(Circle Teller, testnet)"]
+  end
+  F -- "price" --> T
+  T <--> U
+  T <--> E
+  T -. "idle margin (optional)" .-> Y
+  App["Web app (built in Arc Studio)<br/>Business and Dealer dashboards"] --- B
+  App --- D
 ```
-Dealer signs a quote (EIP-712) ──► Hedger opens: both post USDC margin
-        │
-        ├── price moves ──► anyone marks ──► margin moves loser → winner
-        │                        └─ below maintenance ──► margin call ──► top up, or close-out
-        │
-        └── maturity ──► both legs funded ──► settle(): USDC ⇄ EURC in one tx (both or neither)
-                     └── a leg missing after grace ──► funded leg refunded + compensated from margin
+
+### Trade flow
+
+```mermaid
+sequenceDiagram
+  participant D as Dealer
+  participant B as Business
+  participant T as Tenor (Arc)
+  participant C as Chainlink EUR/USD
+  D->>T: depositMargin (USDC)
+  D-->>B: signed quote link (EIP-712, no gas)
+  B->>T: approve + depositMargin (USDC)
+  B->>T: open(quote, signature): rate locked
+  C-->>T: price
+  B->>T: mark(): variation margin moves loser to winner
+  Note over T: below maintenance: margin call, cure window, top up or close-out
+  alt physical delivery
+    D->>T: fundLeg (EURC)
+    B->>T: fundLeg (USDC)
+    B->>T: settle(): USDC and EURC swap in one tx
+  else cash-settled
+    B->>T: settle(): only the difference moves, in USDC
+  end
+  B->>T: withdraw()
+  D->>T: withdraw()
+```
+
+### Trade lifecycle
+
+```mermaid
+stateDiagram-v2
+  [*] --> Open: open(quote)
+  Open --> MarginCall: mark() below maintenance
+  MarginCall --> Open: topUp()
+  MarginCall --> ClosedOut: cure window expires
+  Open --> Matured: maturity
+  Matured --> CashSettled: cash-settled
+  Matured --> Delivered: both legs funded, settle()
+  Matured --> DeliveryFailed: leg missing after grace
+  CashSettled --> [*]
+  Delivered --> [*]
+  DeliveryFailed --> [*]
+  ClosedOut --> [*]
 ```
 
 - **Pricing:** the agreed rate must sit inside a band around the covered-interest-parity forward: spot × (1 + r_usd·t) / (1 + r_eur·t).
